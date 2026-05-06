@@ -633,6 +633,76 @@ button,
   background: #fff;
 }
 
+.template-mapper {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.mapper-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.mapper-heading strong,
+.mapper-heading small {
+  display: block;
+}
+
+.mapper-heading small {
+  margin-top: 3px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.mapping-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.map-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 74px;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.map-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.map-cell {
+  width: 74px;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid #cfd8e3;
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.map-cell.invalid {
+  border-color: var(--red);
+  box-shadow: 0 0 0 2px rgba(190, 61, 57, 0.12);
+}
+
 .option-row {
   display: grid;
   grid-template-columns: 20px 1fr;
@@ -834,6 +904,14 @@ tr:last-child td {
   }
 
   .template-card {
+    grid-template-columns: 1fr;
+  }
+
+  .mapper-heading {
+    display: grid;
+  }
+
+  .mapping-grid {
     grid-template-columns: 1fr;
   }
 

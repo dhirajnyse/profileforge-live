@@ -1,6 +1,26 @@
+const PROFILE_FIELDS = [
+  { id: "roleCode", label: "Role Code", defaultCell: "C2" },
+  { id: "roleTitle", label: "Role Title", defaultCell: "C3" },
+  { id: "candidateName", label: "Candidate Name", defaultCell: "C4" },
+  { id: "yearsOfExperience", label: "Years of Experience", defaultCell: "C5" },
+  { id: "relevantExperience", label: "Relevant Experience", defaultCell: "C6" },
+  { id: "keySkills", label: "Key Skills", defaultCell: "C7" },
+  { id: "certifications", label: "Certifications", defaultCell: "C8" },
+  { id: "educationalQualifications", label: "Educational Qualifications", defaultCell: "C9" },
+  { id: "previousEmployer", label: "Previous Employer", defaultCell: "C10" },
+  { id: "projectsHandled", label: "Projects Handled", defaultCell: "C11" },
+  { id: "note", label: "Note", defaultCell: "C13" },
+];
+
+const DEFAULT_TEMPLATE_MAPPING = PROFILE_FIELDS.reduce((mapping, field) => {
+  mapping[field.id] = field.defaultCell;
+  return mapping;
+}, {});
+
 const state = {
   files: [],
   templateFile: null,
+  templateMapping: { ...DEFAULT_TEMPLATE_MAPPING },
   objectUrls: [],
   pipeline: [],
   taskPlan: [],
@@ -14,6 +34,10 @@ const els = {
   templateFile: document.querySelector("#templateFile"),
   templateModePill: document.querySelector("#templateModePill"),
   templateStatus: document.querySelector("#templateStatus"),
+  templateMapper: document.querySelector("#templateMapper"),
+  mappingGrid: document.querySelector("#mappingGrid"),
+  saveMapping: document.querySelector("#saveMapping"),
+  resetMapping: document.querySelector("#resetMapping"),
   combinedWorkbook: document.querySelector("#combinedWorkbook"),
   chooseFiles: document.querySelector("#chooseFiles"),
   chooseFolder: document.querySelector("#chooseFolder"),
@@ -133,6 +157,14 @@ function storageSet(key, value) {
   } catch {
     // Local storage can be blocked in private browser contexts.
   }
+}
+
+function loadTemplateMapping() {
+  return normalizeTemplateMapping(storageGet("profileforge-template-mapping", DEFAULT_TEMPLATE_MAPPING));
+}
+
+function saveTemplateMapping(mapping) {
+  storageSet("profileforge-template-mapping", normalizeTemplateMapping(mapping));
 }
 
 function downloadTextFile(fileName, content, type = "text/plain") {
@@ -672,11 +704,14 @@ function updateTemplateUi() {
     els.templateModePill.textContent = "Custom Excel Template";
     els.templateStatus.textContent = `${file.name} - ${formatBytes(file.size)}`;
     els.clearTemplate.hidden = false;
+    els.templateMapper.hidden = false;
+    renderTemplateMapper();
     return;
   }
   els.templateModePill.textContent = "Built-in Profile Template";
   els.templateStatus.textContent = "Default ProfileForge template";
   els.clearTemplate.hidden = true;
+  els.templateMapper.hidden = true;
 }
 
 function handleTemplateFile(fileList) {
@@ -690,11 +725,62 @@ function handleTemplateFile(fileList) {
   showToast("Custom template ready");
 }
 
+function renderTemplateMapper() {
+  els.mappingGrid.innerHTML = PROFILE_FIELDS.map((field) => {
+    const value = state.templateMapping[field.id] || field.defaultCell;
+    return `
+      <label class="map-row">
+        <span>${escapeHtml(field.label)}</span>
+        <input class="map-cell" data-map-field="${escapeHtml(field.id)}" type="text" value="${escapeHtml(value)}" inputmode="latin" spellcheck="false" />
+      </label>
+    `;
+  }).join("");
+}
+
+function collectTemplateMappingFromUi() {
+  const mapping = {};
+  const invalid = [];
+  for (const field of PROFILE_FIELDS) {
+    const input = els.mappingGrid.querySelector(`[data-map-field="${field.id}"]`);
+    const raw = String(input?.value || "").trim();
+    const parsed = raw ? parseCellReference(raw) : null;
+    if (!parsed) {
+      invalid.push(field.label);
+      mapping[field.id] = field.defaultCell;
+      input?.classList.add("invalid");
+      continue;
+    }
+    input?.classList.remove("invalid");
+    mapping[field.id] = parsed.ref;
+  }
+  return { mapping, invalid };
+}
+
+function saveTemplateMappingFromUi() {
+  const { mapping, invalid } = collectTemplateMappingFromUi();
+  if (invalid.length) {
+    showToast("Check highlighted cell addresses");
+    return null;
+  }
+  state.templateMapping = mapping;
+  saveTemplateMapping(mapping);
+  renderTemplateMapper();
+  showToast("Template mapping saved");
+  return mapping;
+}
+
 async function readWorkbookTemplate() {
   if (!state.templateFile) return null;
+  const { mapping, invalid } = collectTemplateMappingFromUi();
+  if (invalid.length) {
+    throw new Error("Check template cell addresses.");
+  }
+  state.templateMapping = mapping;
+  saveTemplateMapping(mapping);
   return {
     name: state.templateFile.name,
     bytes: await state.templateFile.arrayBuffer(),
+    mapping,
   };
 }
 
@@ -1015,6 +1101,46 @@ function columnName(index) {
   return value;
 }
 
+function parseCellReference(value) {
+  const cleaned = String(value || "")
+    .trim()
+    .replace(/\$/g, "")
+    .replace(/^.*!/, "")
+    .toUpperCase();
+  const match = cleaned.match(/^([A-Z]{1,3})([1-9]\d{0,6})$/);
+  if (!match) return null;
+  const column = columnNameToIndex(match[1]);
+  const row = Number(match[2]);
+  if (column < 1 || column > 16384 || row < 1 || row > 1048576) return null;
+  return { ref: `${match[1]}${row}`, column, row };
+}
+
+function normalizeTemplateMapping(mapping = DEFAULT_TEMPLATE_MAPPING) {
+  const normalized = {};
+  for (const field of PROFILE_FIELDS) {
+    const parsed = parseCellReference(mapping[field.id] || field.defaultCell);
+    normalized[field.id] = parsed?.ref || field.defaultCell;
+  }
+  return normalized;
+}
+
+function templateContentArea(mapping = DEFAULT_TEMPLATE_MAPPING) {
+  let maxColumn = 3;
+  let maxRow = 13;
+  for (const ref of Object.values(mapping)) {
+    const parsed = parseCellReference(ref);
+    if (!parsed) continue;
+    maxColumn = Math.max(maxColumn, parsed.column);
+    maxRow = Math.max(maxRow, parsed.row);
+  }
+  return {
+    maxColumn,
+    maxRow,
+    ref: `A1:${columnName(maxColumn)}${maxRow}`,
+    absoluteRef: `$A$1:$${columnName(maxColumn)}$${maxRow}`,
+  };
+}
+
 function cellXml(row, col, value, style) {
   const ref = `${columnName(col)}${row}`;
   if (value === null || value === undefined || value === "") {
@@ -1250,24 +1376,34 @@ function columnNameToIndex(name) {
     .reduce((total, char) => total * 26 + char.charCodeAt(0) - 64, 0);
 }
 
-function excelSheetNameReference(sheetName) {
-  return `'${String(sheetName).replace(/'/g, "''")}'!$A$1:$C$13`;
+function excelSheetNameReference(sheetName, area = "$A$1:$C$13") {
+  return `'${String(sheetName).replace(/'/g, "''")}'!${area}`;
 }
 
-function profileTemplateCells(profile) {
+function profileFieldValues(profile) {
   return {
-    C2: profile.roleCode,
-    C3: profile.roleTitle,
-    C4: profile.candidateName,
-    C5: profile.yearsOfExperience,
-    C6: profile.relevantExperience,
-    C7: profile.keySkills,
-    C8: profile.certifications,
-    C9: profile.educationalQualifications,
-    C10: profile.previousEmployer,
-    C11: profile.projectsHandled,
-    C13: "We can provide detailed CV as there is a limited space in this format for projects listing, so we mentioned recent ones",
+    roleCode: profile.roleCode,
+    roleTitle: profile.roleTitle,
+    candidateName: profile.candidateName,
+    yearsOfExperience: profile.yearsOfExperience,
+    relevantExperience: profile.relevantExperience,
+    keySkills: profile.keySkills,
+    certifications: profile.certifications,
+    educationalQualifications: profile.educationalQualifications,
+    previousEmployer: profile.previousEmployer,
+    projectsHandled: profile.projectsHandled,
+    note: "We can provide detailed CV as there is a limited space in this format for projects listing, so we mentioned recent ones",
   };
+}
+
+function profileTemplateCells(profile, mapping = DEFAULT_TEMPLATE_MAPPING) {
+  const fields = profileFieldValues(profile);
+  const normalized = normalizeTemplateMapping(mapping);
+  const cells = {};
+  for (const field of PROFILE_FIELDS) {
+    cells[normalized[field.id]] = fields[field.id];
+  }
+  return cells;
 }
 
 function templateCellXml(prefix, ref, value, attrs = "") {
@@ -1386,26 +1522,40 @@ function templateSheetViewXml(prefix, attrs = "", selfClosing = true) {
   return `<${tagName(prefix, "sheetView")} ${preserved}workbookViewId="0" showGridLines="0" defaultGridColor="0" colorId="1"${close}`;
 }
 
-function limitTemplateWorksheetRange(xml, prefix) {
+function limitTemplateWorksheetRange(xml, prefix, area = templateContentArea()) {
   const p = escapeRegExp(prefix);
-  const colsXml = [
-    `<${tagName(prefix, "cols")}>`,
-    `<${tagName(prefix, "col")} min="1" max="1" width="5.25" customWidth="1"/>`,
-    `<${tagName(prefix, "col")} min="2" max="2" width="24.23" customWidth="1"/>`,
-    `<${tagName(prefix, "col")} min="3" max="3" width="96.23" customWidth="1"/>`,
-    `</${tagName(prefix, "cols")}>`,
-  ].join("");
 
   if (new RegExp(`<${p}dimension\\b[^>]*/>`, "i").test(xml)) {
-    xml = xml.replace(new RegExp(`<${p}dimension\\b[^>]*/>`, "i"), `<${tagName(prefix, "dimension")} ref="A1:C13"/>`);
+    xml = xml.replace(new RegExp(`<${p}dimension\\b[^>]*/>`, "i"), `<${tagName(prefix, "dimension")} ref="${area.ref}"/>`);
   } else {
-    xml = xml.replace(new RegExp(`(<${p}sheetViews\\b)`, "i"), `<${tagName(prefix, "dimension")} ref="A1:C13"/>$1`);
+    xml = xml.replace(new RegExp(`(<${p}sheetViews\\b)`, "i"), `<${tagName(prefix, "dimension")} ref="${area.ref}"/>$1`);
   }
 
   if (new RegExp(`<${p}cols\\b[^>]*>[\\s\\S]*?<\\/${p}cols>`, "i").test(xml)) {
-    xml = xml.replace(new RegExp(`<${p}cols\\b[^>]*>[\\s\\S]*?<\\/${p}cols>`, "i"), colsXml);
+    xml = xml.replace(new RegExp(`<${p}cols\\b[^>]*>[\\s\\S]*?<\\/${p}cols>`, "i"), (colsBlock) => {
+      const cols = [];
+      for (const match of colsBlock.matchAll(new RegExp(`<${p}col\\b([^>]*)/>`, "gi"))) {
+        const attrs = match[1];
+        const min = Number(attrs.match(/\bmin="(\d+)"/i)?.[1] || 0);
+        const max = Number(attrs.match(/\bmax="(\d+)"/i)?.[1] || min);
+        if (min && max && min <= area.maxColumn && max >= 1) {
+          const boundedAttrs = attrs
+            .replace(/\bmin="\d+"/i, `min="${Math.max(1, min)}"`)
+            .replace(/\bmax="\d+"/i, `max="${Math.min(area.maxColumn, max)}"`);
+          cols.push(`<${tagName(prefix, "col")}${boundedAttrs}/>`);
+        }
+      }
+      return cols.length ? `<${tagName(prefix, "cols")}>${cols.join("")}</${tagName(prefix, "cols")}>` : "";
+    });
   } else {
-    xml = xml.replace(new RegExp(`(<${p}sheetData\\b)`, "i"), `${colsXml}$1`);
+    const fallbackCols = [
+      `<${tagName(prefix, "cols")}>`,
+      `<${tagName(prefix, "col")} min="1" max="1" width="5.25" customWidth="1"/>`,
+      `<${tagName(prefix, "col")} min="2" max="2" width="24.23" customWidth="1"/>`,
+      `<${tagName(prefix, "col")} min="3" max="${Math.min(area.maxColumn, 3)}" width="96.23" customWidth="1"/>`,
+      `</${tagName(prefix, "cols")}>`,
+    ].join("");
+    xml = xml.replace(new RegExp(`(<${p}sheetData\\b)`, "i"), `${fallbackCols}$1`);
   }
 
   xml = xml
@@ -1422,14 +1572,14 @@ function limitTemplateWorksheetRange(xml, prefix) {
       (rowMatch, openAttrs, content, selfAttrs) => {
         const attrs = openAttrs ?? selfAttrs ?? "";
         const rowNumber = Number(attrs.match(/\br="(\d+)"/i)?.[1]);
-        if (!rowNumber || rowNumber < 1 || rowNumber > 13 || content === undefined) {
+        if (!rowNumber || rowNumber < 1 || rowNumber > area.maxRow || content === undefined) {
           return "";
         }
 
         const cleanCell = (cellMatch, colName, rowRef) => {
           const colNumber = columnNameToIndex(colName);
           const cellRow = Number(rowRef);
-          return colNumber >= 1 && colNumber <= 3 && cellRow >= 1 && cellRow <= 13 ? cellMatch : "";
+          return colNumber >= 1 && colNumber <= area.maxColumn && cellRow >= 1 && cellRow <= area.maxRow ? cellMatch : "";
         };
 
         const cells = content
@@ -1443,7 +1593,7 @@ function limitTemplateWorksheetRange(xml, prefix) {
   });
 }
 
-function ensureTemplateSheetOutputSettings(xml) {
+function ensureTemplateSheetOutputSettings(xml, area = templateContentArea()) {
   const prefix = xmlPrefix(xml, "worksheet");
   const p = escapeRegExp(prefix);
   const footerXml = `<${tagName(prefix, "headerFooter")}><${tagName(prefix, "oddFooter")}>&amp;L&amp;F&amp;C&amp;A&amp;R&amp;P/&amp;N</${tagName(prefix, "oddFooter")}></${tagName(prefix, "headerFooter")}>`;
@@ -1498,7 +1648,7 @@ function ensureTemplateSheetOutputSettings(xml) {
     xml = xml.replace(new RegExp(`(<\\/${p}worksheet>)`, "i"), `${footerXml}$1`);
   }
 
-  return limitTemplateWorksheetRange(xml, prefix);
+  return limitTemplateWorksheetRange(xml, prefix, area);
 }
 
 function setXmlAttr(attrs, name, value) {
@@ -1618,7 +1768,7 @@ function ensureTemplateWorkbookPrintAreas(workbookXml, sheets, prefix) {
   const definedNames = sheets
     .map(
       (sheet, index) =>
-        `<${tagName(prefix, "definedName")} name="_xlnm.Print_Area" localSheetId="${index}">${xmlEscape(excelSheetNameReference(sheet.name))}</${tagName(prefix, "definedName")}>`,
+        `<${tagName(prefix, "definedName")} name="_xlnm.Print_Area" localSheetId="${index}">${xmlEscape(excelSheetNameReference(sheet.name, sheet.area?.absoluteRef || "$A$1:$C$13"))}</${tagName(prefix, "definedName")}>`,
     )
     .join("");
 
@@ -1628,11 +1778,14 @@ function ensureTemplateWorkbookPrintAreas(workbookXml, sheets, prefix) {
         new RegExp(`<${p}definedName\\b(?=[^>]*\\bname="_xlnm\\.Print_Area")[^>]*>[\\s\\S]*?<\\/${p}definedName>`, "gi"),
         "",
       );
-      return withoutPrintAreas.replace(new RegExp(`(<\\/${p}definedNames>)`, "i"), `${definedNames}$1`);
+      return withoutPrintAreas.replace(new RegExp(`(<\\/${p}definedNames>)`, "i"), (match) => `${definedNames}${match}`);
     });
   }
 
-  return workbookXml.replace(new RegExp(`(<\\/${p}workbook>)`, "i"), `<${tagName(prefix, "definedNames")}>${definedNames}</${tagName(prefix, "definedNames")}>$1`);
+  return workbookXml.replace(
+    new RegExp(`(<\\/${p}workbook>)`, "i"),
+    (match) => `<${tagName(prefix, "definedNames")}>${definedNames}</${tagName(prefix, "definedNames")}>${match}`,
+  );
 }
 
 function replaceTemplateWorkbookSheetsXml(workbookXml, sheets) {
@@ -1677,12 +1830,13 @@ function templateContentTypesXml(contentXml, sheetCount) {
   return cleaned.replace(/(<\/(?:[A-Za-z_][\w.-]*:)?Types>)/i, `${sheetOverrides}$1`);
 }
 
-function fillTemplateWorksheetXml(sheetXml, profile) {
+function fillTemplateWorksheetXml(sheetXml, profile, mapping = DEFAULT_TEMPLATE_MAPPING) {
   let xml = sheetXml;
-  for (const [ref, value] of Object.entries(profileTemplateCells(profile))) {
+  const area = templateContentArea(mapping);
+  for (const [ref, value] of Object.entries(profileTemplateCells(profile, mapping))) {
     xml = setTemplateCell(xml, ref, value);
   }
-  return ensureTemplateSheetOutputSettings(xml);
+  return ensureTemplateSheetOutputSettings(xml, area);
 }
 
 async function createWorkbookFromTemplate(records, templateSource) {
@@ -1708,9 +1862,12 @@ async function createWorkbookFromTemplate(records, templateSource) {
 
   const baseSheetXml = await baseSheetFile.async("string");
   const usedNames = new Set();
+  const mapping = normalizeTemplateMapping(templateSource.mapping || DEFAULT_TEMPLATE_MAPPING);
+  const area = templateContentArea(mapping);
   const sheets = records.map((record) => ({
     name: makeSheetName(record.sourceName, usedNames),
     profile: record.profile,
+    area,
   }));
 
   Object.keys(zip.files).forEach((name) => {
@@ -1721,7 +1878,7 @@ async function createWorkbookFromTemplate(records, templateSource) {
   zip.remove("xl/calcChain.xml");
 
   sheets.forEach((sheet, index) => {
-    zip.file(`xl/worksheets/sheet${index + 1}.xml`, fillTemplateWorksheetXml(baseSheetXml, sheet.profile));
+    zip.file(`xl/worksheets/sheet${index + 1}.xml`, fillTemplateWorksheetXml(baseSheetXml, sheet.profile, mapping));
   });
 
   zip.file("xl/workbook.xml", replaceTemplateWorkbookSheetsXml(workbookXmlText, sheets));
@@ -1882,6 +2039,13 @@ els.clearTemplate.addEventListener("click", () => {
   updateTemplateUi();
   showToast("Default template selected");
 });
+els.saveMapping.addEventListener("click", saveTemplateMappingFromUi);
+els.resetMapping.addEventListener("click", () => {
+  state.templateMapping = { ...DEFAULT_TEMPLATE_MAPPING };
+  saveTemplateMapping(state.templateMapping);
+  renderTemplateMapper();
+  showToast("Template mapping reset");
+});
 els.convertButton.addEventListener("click", convertCvs);
 els.createPlan?.addEventListener("click", () => {
   state.taskPlan = createWorkflowPlan(els.workflowPreset.value, els.taskPrompt.value);
@@ -1945,6 +2109,8 @@ document.querySelectorAll?.("[data-recipe]").forEach((button) => {
 els.dropzone.addEventListener("drop", (event) => addFiles(event.dataTransfer.files));
 
 window.addEventListener("load", updateConvertState);
+state.templateMapping = loadTemplateMapping();
+renderTemplateMapper();
 updateTemplateUi();
 loadPipeline();
 renderPipeline();

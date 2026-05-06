@@ -72,6 +72,20 @@
           </div>
         </div>
 
+        <div class="template-mapper" id="templateMapper" hidden>
+          <div class="mapper-heading">
+            <div>
+              <strong>Template Mapper</strong>
+              <small>Map each extracted profile field to a cell in your uploaded template</small>
+            </div>
+            <div class="template-actions">
+              <button type="button" class="secondary subtle" id="resetMapping">Reset</button>
+              <button type="button" class="secondary" id="saveMapping">Save</button>
+            </div>
+          </div>
+          <div class="mapping-grid" id="mappingGrid"></div>
+        </div>
+
         <label class="option-row">
           <input id="combinedWorkbook" type="checkbox" checked />
           <span>
@@ -303,6 +317,6 @@
     </section>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=20260506-custom-template"></script>
+    <script src="./app.js?v=20260506-template-mapper"></script>
   </body>
 </html>

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ProfileForge</title>
+    <link rel="icon" href="./assets/profileforge-logo.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <img class="brand-logo" src="./assets/profileforge-logo.svg" alt="ProfileForge" />
+        <div class="brand-text">
+          <h1>ProfileForge</h1>
+          <p>CV PDF to Excel profile automation</p>
+        </div>
+      </div>
+      <div class="status-pill ready" id="appStatus">Ready</div>
+    </header>
+
+    <main class="workspace">
+      <section class="panel setup-panel">
+        <div class="panel-heading">
+          <h2>Input</h2>
+          <span class="format-pill">Built-in Profile Template</span>
+        </div>
+
+        <div class="dropzone" id="dropzone">
+          <input id="pdfFiles" type="file" accept=".pdf" multiple />
+          <input id="pdfFolder" type="file" accept=".pdf" multiple webkitdirectory />
+          <div class="drop-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M17 8l-5-5-5 5"></path><path d="M12 3v12"></path></svg>
+          </div>
+          <h2>CV PDFs</h2>
+          <p id="fileCount">No PDFs selected</p>
+          <div class="button-row">
+            <button type="button" class="secondary" id="chooseFiles">
+              <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>
+              Files
+            </button>
+            <button type="button" class="secondary" id="chooseFolder">
+              <svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+              Folder
+            </button>
+          </div>
+        </div>
+
+        <div class="selected-list" id="selectedList"></div>
+
+        <label class="option-row">
+          <input id="combinedWorkbook" type="checkbox" checked />
+          <span>
+            <strong>One workbook with multiple sheets</strong>
+            <small>Sheet names follow the PDF file names</small>
+          </span>
+        </label>
+
+        <button type="button" class="primary" id="convertButton" disabled>
+          <svg viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>
+          Convert CVs
+        </button>
+      </section>
+
+      <section class="panel results-panel">
+        <div class="panel-heading">
+          <h2>Results</h2>
+          <div class="output-actions">
+            <a class="download-all disabled" id="downloadCombined" href="#" aria-disabled="true" download="combined-cv-profiles.xlsx">
+              <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>
+              Combined
+            </a>
+            <a class="download-all disabled" id="downloadZip" href="#" aria-disabled="true" download="converted-cv-profiles.zip">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg>
+              ZIP
+            </a>
+          </div>
+        </div>
+
+        <div class="progress-block">
+          <div class="progress-meta">
+            <span id="jobStatus">Idle</span>
+            <span id="jobCounts">0 / 0</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>CV</th>
+                <th>Candidate</th>
+                <th>Role</th>
+                <th>Years</th>
+                <th>File</th>
+              </tr>
+            </thead>
+            <tbody id="resultsBody">
+              <tr class="empty-row">
+                <td colspan="5">Awaiting conversion</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js?v=20260505-footer"></script>
+  </body>
+</html>

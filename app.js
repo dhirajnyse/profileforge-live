@@ -1,5 +1,6 @@
 const state = {
   files: [],
+  templateFile: null,
   objectUrls: [],
   pipeline: [],
   taskPlan: [],
@@ -10,9 +11,14 @@ const els = {
   appStatus: document.querySelector("#appStatus"),
   pdfFiles: document.querySelector("#pdfFiles"),
   pdfFolder: document.querySelector("#pdfFolder"),
+  templateFile: document.querySelector("#templateFile"),
+  templateModePill: document.querySelector("#templateModePill"),
+  templateStatus: document.querySelector("#templateStatus"),
   combinedWorkbook: document.querySelector("#combinedWorkbook"),
   chooseFiles: document.querySelector("#chooseFiles"),
   chooseFolder: document.querySelector("#chooseFolder"),
+  chooseTemplate: document.querySelector("#chooseTemplate"),
+  clearTemplate: document.querySelector("#clearTemplate"),
   dropzone: document.querySelector("#dropzone"),
   fileCount: document.querySelector("#fileCount"),
   selectedList: document.querySelector("#selectedList"),
@@ -660,6 +666,38 @@ function addFiles(fileList) {
   updateConvertState();
 }
 
+function updateTemplateUi() {
+  const file = state.templateFile;
+  if (file) {
+    els.templateModePill.textContent = "Custom Excel Template";
+    els.templateStatus.textContent = `${file.name} - ${formatBytes(file.size)}`;
+    els.clearTemplate.hidden = false;
+    return;
+  }
+  els.templateModePill.textContent = "Built-in Profile Template";
+  els.templateStatus.textContent = "Default ProfileForge template";
+  els.clearTemplate.hidden = true;
+}
+
+function handleTemplateFile(fileList) {
+  const file = Array.from(fileList || []).find((item) => /\.xlsx$/i.test(item.name));
+  if (!file) {
+    showToast("Select an .xlsx template");
+    return;
+  }
+  state.templateFile = file;
+  updateTemplateUi();
+  showToast("Custom template ready");
+}
+
+async function readWorkbookTemplate() {
+  if (!state.templateFile) return null;
+  return {
+    name: state.templateFile.name,
+    bytes: await state.templateFile.arrayBuffer(),
+  };
+}
+
 function renderSelectedFiles() {
   els.fileCount.textContent = state.files.length ? `${state.files.length} PDF${state.files.length === 1 ? "" : "s"} selected` : "No PDFs selected";
   els.selectedList.innerHTML = "";
@@ -1184,6 +1222,528 @@ async function createWorkbookBlob(records) {
   return bytes;
 }
 
+function xmlDecodeAttr(value) {
+  return String(value || "")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function xmlPrefix(xml, rootName) {
+  return xml.match(new RegExp(`<([A-Za-z_][\\w.-]*:)?${rootName}\\b`, "i"))?.[1] || "";
+}
+
+function tagName(prefix, localName) {
+  return `${prefix}${localName}`;
+}
+
+function columnNameToIndex(name) {
+  return String(name || "")
+    .toUpperCase()
+    .split("")
+    .reduce((total, char) => total * 26 + char.charCodeAt(0) - 64, 0);
+}
+
+function excelSheetNameReference(sheetName) {
+  return `'${String(sheetName).replace(/'/g, "''")}'!$A$1:$C$13`;
+}
+
+function profileTemplateCells(profile) {
+  return {
+    C2: profile.roleCode,
+    C3: profile.roleTitle,
+    C4: profile.candidateName,
+    C5: profile.yearsOfExperience,
+    C6: profile.relevantExperience,
+    C7: profile.keySkills,
+    C8: profile.certifications,
+    C9: profile.educationalQualifications,
+    C10: profile.previousEmployer,
+    C11: profile.projectsHandled,
+    C13: "We can provide detailed CV as there is a limited space in this format for projects listing, so we mentioned recent ones",
+  };
+}
+
+function templateCellXml(prefix, ref, value, attrs = "") {
+  const cleanAttrs = attrs
+    .replace(/\s?r="[^"]*"/i, "")
+    .replace(/\s?t="[^"]*"/i, "")
+    .trim();
+  const attrText = cleanAttrs ? ` ${cleanAttrs}` : "";
+  const cell = tagName(prefix, "c");
+  if (value === null || value === undefined || value === "") {
+    return `<${cell} r="${ref}"${attrText}/>`;
+  }
+  const inlineString = tagName(prefix, "is");
+  const text = tagName(prefix, "t");
+  return `<${cell} r="${ref}"${attrText} t="inlineStr"><${inlineString}><${text}>${xmlEscape(value)}</${text}></${inlineString}></${cell}>`;
+}
+
+function ensureTemplateRow(xml, rowNumber, prefix) {
+  const p = escapeRegExp(prefix);
+  const row = tagName(prefix, "row");
+  const sheetData = tagName(prefix, "sheetData");
+  const rowPattern = new RegExp(`<${p}row\\b(?=[^>]*\\br="${rowNumber}")[^>]*(?:>[\\s\\S]*?<\\/${p}row>|\\s*\\/>)`, "i");
+  if (rowPattern.test(xml)) return xml;
+
+  const newRow = `<${row} r="${rowNumber}"></${row}>`;
+  const sheetDataPattern = new RegExp(`(<${p}sheetData\\b[^>]*>)([\\s\\S]*?)(<\\/${p}sheetData>)`, "i");
+  if (!sheetDataPattern.test(xml)) {
+    return xml.replace(new RegExp(`(<\\/${p}worksheet>)`, "i"), `<${sheetData}>${newRow}</${sheetData}>$1`);
+  }
+
+  return xml.replace(sheetDataPattern, (match, open, body, close) => {
+    const existingRows = Array.from(body.matchAll(new RegExp(`<${p}row\\b[^>]*(?:>[\\s\\S]*?<\\/${p}row>|\\s*\\/>)`, "gi")));
+    let insertAt = body.length;
+    for (const rowMatch of existingRows) {
+      const existingNumber = Number(rowMatch[0].match(/\br="(\d+)"/i)?.[1]);
+      if (existingNumber > rowNumber) {
+        insertAt = rowMatch.index;
+        break;
+      }
+    }
+    return `${open}${body.slice(0, insertAt)}${newRow}${body.slice(insertAt)}${close}`;
+  });
+}
+
+function insertTemplateCell(xml, ref, value, prefix) {
+  const rowNumber = Number(ref.match(/\d+/)?.[0] || 0);
+  const column = ref.match(/[A-Z]+/i)?.[0] || "A";
+  const targetColumn = columnNameToIndex(column);
+  const p = escapeRegExp(prefix);
+  const row = tagName(prefix, "row");
+  const rowPattern = new RegExp(`<${p}row\\b(?=[^>]*\\br="${rowNumber}")[^>]*(?:>[\\s\\S]*?<\\/${p}row>|\\s*\\/>)`, "i");
+
+  xml = ensureTemplateRow(xml, rowNumber, prefix);
+  return xml.replace(rowPattern, (rowXml) => {
+    const cell = templateCellXml(prefix, ref, value);
+    if (/\/>\s*$/.test(rowXml)) {
+      const attrs = rowXml.match(new RegExp(`<${p}row\\b([^>]*)\\/>`, "i"))?.[1] || "";
+      return `<${row}${attrs}>${cell}</${row}>`;
+    }
+
+    return rowXml.replace(new RegExp(`(<${p}row\\b[^>]*>)([\\s\\S]*?)(<\\/${p}row>)`, "i"), (match, open, body, close) => {
+      const cells = Array.from(body.matchAll(new RegExp(`<${p}c\\b[^>]*(?:>[\\s\\S]*?<\\/${p}c>|\\s*\\/>)`, "gi")));
+      let insertAt = body.length;
+      for (const existingCell of cells) {
+        const existingColumn = existingCell[0].match(/\br="([A-Z]+)\d+"/i)?.[1];
+        if (existingColumn && columnNameToIndex(existingColumn) > targetColumn) {
+          insertAt = existingCell.index;
+          break;
+        }
+      }
+      return `${open}${body.slice(0, insertAt)}${cell}${body.slice(insertAt)}${close}`;
+    });
+  });
+}
+
+function setTemplateCell(xml, ref, value) {
+  const prefix = xmlPrefix(xml, "worksheet");
+  const p = escapeRegExp(prefix);
+  const cellPattern = new RegExp(`<${p}c\\b(?=[^>]*\\br="${ref}")[^>]*(?:>[\\s\\S]*?<\\/${p}c>|\\s*\\/>)`, "i");
+  if (!cellPattern.test(xml)) {
+    return insertTemplateCell(xml, ref, value, prefix);
+  }
+  return xml.replace(cellPattern, (match) => {
+    const attrs = match.match(new RegExp(`<${p}c\\b([^>]*)`, "i"))?.[1] || "";
+    return templateCellXml(prefix, ref, value, attrs);
+  });
+}
+
+function replaceOrInsertSelfClosingXml(xml, tagLocalName, replacement, insertBeforeLocalName, prefix) {
+  const p = escapeRegExp(prefix);
+  const tag = tagName(prefix, tagLocalName);
+  const tagPattern = new RegExp(`<${p}${tagLocalName}\\b[^>]*/>`, "i");
+  if (tagPattern.test(xml)) {
+    return xml.replace(tagPattern, replacement);
+  }
+
+  const openClosePattern = new RegExp(`<${p}${tagLocalName}\\b[^>]*>[\\s\\S]*?<\\/${p}${tagLocalName}>`, "i");
+  if (openClosePattern.test(xml)) {
+    return xml.replace(openClosePattern, replacement);
+  }
+
+  const insertPattern = new RegExp(`(<${p}${insertBeforeLocalName}\\b)`, "i");
+  if (insertPattern.test(xml)) {
+    return xml.replace(insertPattern, `${replacement}$1`);
+  }
+
+  return xml.replace(new RegExp(`(<\\/${p}worksheet>)`, "i"), `${replacement}$1`);
+}
+
+function templateSheetViewXml(prefix, attrs = "", selfClosing = true) {
+  const cleanedAttrs = attrs
+    .replace(/\s(?:showGridLines|defaultGridColor|colorId|workbookViewId)="[^"]*"/gi, "")
+    .trim();
+  const preserved = cleanedAttrs ? `${cleanedAttrs} ` : "";
+  const close = selfClosing ? "/>" : ">";
+  return `<${tagName(prefix, "sheetView")} ${preserved}workbookViewId="0" showGridLines="0" defaultGridColor="0" colorId="1"${close}`;
+}
+
+function limitTemplateWorksheetRange(xml, prefix) {
+  const p = escapeRegExp(prefix);
+  const colsXml = [
+    `<${tagName(prefix, "cols")}>`,
+    `<${tagName(prefix, "col")} min="1" max="1" width="5.25" customWidth="1"/>`,
+    `<${tagName(prefix, "col")} min="2" max="2" width="24.23" customWidth="1"/>`,
+    `<${tagName(prefix, "col")} min="3" max="3" width="96.23" customWidth="1"/>`,
+    `</${tagName(prefix, "cols")}>`,
+  ].join("");
+
+  if (new RegExp(`<${p}dimension\\b[^>]*/>`, "i").test(xml)) {
+    xml = xml.replace(new RegExp(`<${p}dimension\\b[^>]*/>`, "i"), `<${tagName(prefix, "dimension")} ref="A1:C13"/>`);
+  } else {
+    xml = xml.replace(new RegExp(`(<${p}sheetViews\\b)`, "i"), `<${tagName(prefix, "dimension")} ref="A1:C13"/>$1`);
+  }
+
+  if (new RegExp(`<${p}cols\\b[^>]*>[\\s\\S]*?<\\/${p}cols>`, "i").test(xml)) {
+    xml = xml.replace(new RegExp(`<${p}cols\\b[^>]*>[\\s\\S]*?<\\/${p}cols>`, "i"), colsXml);
+  } else {
+    xml = xml.replace(new RegExp(`(<${p}sheetData\\b)`, "i"), `${colsXml}$1`);
+  }
+
+  xml = xml
+    .replace(new RegExp(`<${p}tableParts\\b[^>]*>[\\s\\S]*?<\\/${p}tableParts>`, "gi"), "")
+    .replace(new RegExp(`<${p}autoFilter\\b[^>]*/>`, "gi"), "")
+    .replace(new RegExp(`<${p}drawing\\b[^>]*/>`, "gi"), "")
+    .replace(new RegExp(`<${p}legacyDrawing\\b[^>]*/>`, "gi"), "")
+    .replace(new RegExp(`<${p}picture\\b[^>]*>[\\s\\S]*?<\\/${p}picture>`, "gi"), "")
+    .replace(new RegExp(`<${p}picture\\b[^>]*/>`, "gi"), "");
+
+  return xml.replace(new RegExp(`<${p}sheetData\\b[^>]*>([\\s\\S]*?)<\\/${p}sheetData>`, "i"), (match, body) => {
+    const rows = body.replace(
+      new RegExp(`<${p}row\\b([^>]*)>([\\s\\S]*?)<\\/${p}row>|<${p}row\\b([^>]*)\\/>`, "gi"),
+      (rowMatch, openAttrs, content, selfAttrs) => {
+        const attrs = openAttrs ?? selfAttrs ?? "";
+        const rowNumber = Number(attrs.match(/\br="(\d+)"/i)?.[1]);
+        if (!rowNumber || rowNumber < 1 || rowNumber > 13 || content === undefined) {
+          return "";
+        }
+
+        const cleanCell = (cellMatch, colName, rowRef) => {
+          const colNumber = columnNameToIndex(colName);
+          const cellRow = Number(rowRef);
+          return colNumber >= 1 && colNumber <= 3 && cellRow >= 1 && cellRow <= 13 ? cellMatch : "";
+        };
+
+        const cells = content
+          .replace(new RegExp(`<${p}c\\b[^>]*\\br="([A-Z]+)(\\d+)"[^>]*>[\\s\\S]*?<\\/${p}c>`, "gi"), cleanCell)
+          .replace(new RegExp(`<${p}c\\b[^>]*\\br="([A-Z]+)(\\d+)"[^>]*/>`, "gi"), cleanCell);
+        const cleanedAttrs = attrs.replace(/\ss="[^"]*"/gi, "").replace(/\scustomFormat="[^"]*"/gi, "");
+        return `<${tagName(prefix, "row")}${cleanedAttrs}>${cells}</${tagName(prefix, "row")}>`;
+      },
+    );
+    return `<${tagName(prefix, "sheetData")}>${rows}</${tagName(prefix, "sheetData")}>`;
+  });
+}
+
+function ensureTemplateSheetOutputSettings(xml) {
+  const prefix = xmlPrefix(xml, "worksheet");
+  const p = escapeRegExp(prefix);
+  const footerXml = `<${tagName(prefix, "headerFooter")}><${tagName(prefix, "oddFooter")}>&amp;L&amp;F&amp;C&amp;A&amp;R&amp;P/&amp;N</${tagName(prefix, "oddFooter")}></${tagName(prefix, "headerFooter")}>`;
+
+  if (new RegExp(`<${p}sheetPr\\b[^>]*/>`, "i").test(xml)) {
+    xml = xml.replace(new RegExp(`<${p}sheetPr\\b([^>]*)/>`, "i"), `<${tagName(prefix, "sheetPr")}$1><${tagName(prefix, "pageSetUpPr")} fitToPage="1"/></${tagName(prefix, "sheetPr")}>`);
+  } else if (new RegExp(`<${p}sheetPr\\b[^>]*>`, "i").test(xml)) {
+    if (new RegExp(`<${p}pageSetUpPr\\b[^>]*/>`, "i").test(xml)) {
+      xml = xml.replace(new RegExp(`<${p}pageSetUpPr\\b[^>]*/>`, "i"), `<${tagName(prefix, "pageSetUpPr")} fitToPage="1"/>`);
+    } else {
+      xml = xml.replace(new RegExp(`(<${p}sheetPr\\b[^>]*>)`, "i"), `$1<${tagName(prefix, "pageSetUpPr")} fitToPage="1"/>`);
+    }
+  } else {
+    xml = xml.replace(new RegExp(`(<${p}worksheet\\b[^>]*>)`, "i"), `$1<${tagName(prefix, "sheetPr")}><${tagName(prefix, "pageSetUpPr")} fitToPage="1"/></${tagName(prefix, "sheetPr")}>`);
+  }
+
+  if (new RegExp(`<${p}sheetView\\b[^>]*/>`, "i").test(xml)) {
+    xml = xml.replace(new RegExp(`<${p}sheetView\\b([^>]*)/>`, "i"), (match, attrs) => templateSheetViewXml(prefix, attrs, true));
+  } else if (new RegExp(`<${p}sheetView\\b[^>]*>`, "i").test(xml)) {
+    xml = xml.replace(new RegExp(`<${p}sheetView\\b([^>]*)>`, "i"), (match, attrs) => templateSheetViewXml(prefix, attrs, false));
+  } else if (new RegExp(`<${p}sheetViews\\b[^>]*>`, "i").test(xml)) {
+    xml = xml.replace(new RegExp(`(<${p}sheetViews\\b[^>]*>)`, "i"), `$1${templateSheetViewXml(prefix, "", true)}`);
+  } else {
+    xml = xml.replace(new RegExp(`(<${p}sheetFormatPr\\b)`, "i"), `<${tagName(prefix, "sheetViews")}>${templateSheetViewXml(prefix, "", true)}</${tagName(prefix, "sheetViews")}>$1`);
+  }
+
+  xml = replaceOrInsertSelfClosingXml(xml, "printOptions", `<${tagName(prefix, "printOptions")} horizontalCentered="1" gridLines="0"/>`, "pageMargins", prefix);
+  xml = replaceOrInsertSelfClosingXml(
+    xml,
+    "pageMargins",
+    `<${tagName(prefix, "pageMargins")} left="0.25" right="0.25" top="0.35" bottom="0.35" header="0.1" footer="0.1"/>`,
+    "pageSetup",
+    prefix,
+  );
+
+  const pageSetupXml = `<${tagName(prefix, "pageSetup")} paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="1" horizontalDpi="300" verticalDpi="300"/>`;
+  if (new RegExp(`<${p}pageSetup\\b[^>]*/>`, "i").test(xml)) {
+    xml = xml.replace(new RegExp(`<${p}pageSetup\\b[^>]*/>`, "i"), pageSetupXml);
+  } else if (new RegExp(`<${p}pageSetup\\b[^>]*>[\\s\\S]*?<\\/${p}pageSetup>`, "i").test(xml)) {
+    xml = xml.replace(new RegExp(`<${p}pageSetup\\b[^>]*>[\\s\\S]*?<\\/${p}pageSetup>`, "i"), pageSetupXml);
+  } else if (new RegExp(`<${p}pageMargins\\b[^>]*/>`, "i").test(xml)) {
+    xml = xml.replace(new RegExp(`(<${p}pageMargins\\b[^>]*/>)`, "i"), `$1${pageSetupXml}`);
+  } else {
+    xml = xml.replace(new RegExp(`(<\\/${p}worksheet>)`, "i"), `${pageSetupXml}$1`);
+  }
+
+  if (new RegExp(`<${p}headerFooter\\b[^>]*>[\\s\\S]*?<\\/${p}headerFooter>`, "i").test(xml)) {
+    xml = xml.replace(new RegExp(`<${p}headerFooter\\b[^>]*>[\\s\\S]*?<\\/${p}headerFooter>`, "i"), footerXml);
+  } else if (new RegExp(`<${p}pageSetup\\b[^>]*/>`, "i").test(xml)) {
+    xml = xml.replace(new RegExp(`(<${p}pageSetup\\b[^>]*/>)`, "i"), `$1${footerXml}`);
+  } else {
+    xml = xml.replace(new RegExp(`(<\\/${p}worksheet>)`, "i"), `${footerXml}$1`);
+  }
+
+  return limitTemplateWorksheetRange(xml, prefix);
+}
+
+function setXmlAttr(attrs, name, value) {
+  const pattern = new RegExp(`\\s${name}="[^"]*"`, "i");
+  if (pattern.test(attrs)) {
+    return attrs.replace(pattern, ` ${name}="${value}"`);
+  }
+  return `${attrs} ${name}="${value}"`;
+}
+
+function removeXmlAttr(attrs, name) {
+  return attrs.replace(new RegExp(`\\s${name}="[^"]*"`, "i"), "");
+}
+
+function normalizeXfXml(xfXml, prefix, forceNoBorder) {
+  const p = escapeRegExp(prefix);
+  const xf = tagName(prefix, "xf");
+  const alignment = tagName(prefix, "alignment");
+  const openMatch = xfXml.match(new RegExp(`^<${p}xf\\b([^>]*?)(\\/?)>`, "i"));
+  if (!openMatch) return xfXml;
+
+  let attrs = openMatch[1] || "";
+  if (forceNoBorder) {
+    attrs = setXmlAttr(removeXmlAttr(removeXmlAttr(attrs, "borderId"), "applyBorder"), "borderId", "0");
+  }
+  attrs = setXmlAttr(attrs, "applyAlignment", "1");
+
+  if (openMatch[2]) {
+    return `<${xf}${attrs}><${alignment} vertical="center"/></${xf}>`;
+  }
+
+  let normalized = xfXml.replace(new RegExp(`^<${p}xf\\b[^>]*>`, "i"), `<${xf}${attrs}>`);
+  if (new RegExp(`<${p}alignment\\b[^>]*/>`, "i").test(normalized)) {
+    return normalized.replace(new RegExp(`<${p}alignment\\b([^>]*)/>`, "i"), (match, alignmentAttrs) => {
+      const cleanAttrs = setXmlAttr(alignmentAttrs.replace(/\svertical="[^"]*"/i, ""), "vertical", "center");
+      return `<${alignment}${cleanAttrs}/>`;
+    });
+  }
+  if (new RegExp(`<${p}alignment\\b[^>]*>`, "i").test(normalized)) {
+    return normalized.replace(new RegExp(`<${p}alignment\\b([^>]*)>`, "i"), (match, alignmentAttrs) => {
+      const cleanAttrs = setXmlAttr(alignmentAttrs.replace(/\svertical="[^"]*"/i, ""), "vertical", "center");
+      return `<${alignment}${cleanAttrs}>`;
+    });
+  }
+  return normalized.replace(new RegExp(`(<\\/${p}xf>)`, "i"), `<${alignment} vertical="center"/>$1`);
+}
+
+function normalizeTemplateStylesXml(xml) {
+  const prefix = xmlPrefix(xml, "styleSheet");
+  const p = escapeRegExp(prefix);
+
+  xml = xml.replace(new RegExp(`<${p}fonts\\b[^>]*>[\\s\\S]*?<\\/${p}fonts>`, "i"), (fontsXml) =>
+    fontsXml
+      .replace(new RegExp(`<${p}sz\\b[^>]*/>`, "gi"), `<${tagName(prefix, "sz")} val="10"/>`)
+      .replace(new RegExp(`<${p}name\\b[^>]*/>`, "gi"), `<${tagName(prefix, "name")} val="Calibri"/>`),
+  );
+
+  xml = xml.replace(/\bvertical="top"/gi, 'vertical="center"');
+  return xml.replace(new RegExp(`<${p}cellXfs\\b[^>]*>[\\s\\S]*?<\\/${p}cellXfs>`, "i"), (block) => {
+    let isFirst = true;
+    return block.replace(new RegExp(`<${p}xf\\b[^>]*(?:>[\\s\\S]*?<\\/${p}xf>|\\s*\\/>)`, "gi"), (xfXml) => {
+      const updated = normalizeXfXml(xfXml, prefix, isFirst);
+      isFirst = false;
+      return updated;
+    });
+  });
+}
+
+function normalizeWorkbookTarget(target) {
+  const cleaned = String(target || "").replace(/^\/+/, "").replace(/^\.\.\//, "");
+  return cleaned.startsWith("xl/") ? cleaned : `xl/${cleaned}`;
+}
+
+function parseWorkbookSheets(workbookXml, relsXml) {
+  const rels = new Map();
+  for (const match of relsXml.matchAll(/<(?:[A-Za-z_][\w.-]*:)?Relationship\b([^>]*)\/>/g)) {
+    const attrs = match[1];
+    const id = attrs.match(/\bId="([^"]+)"/)?.[1];
+    const target = attrs.match(/\bTarget="([^"]+)"/)?.[1];
+    const type = attrs.match(/\bType="([^"]+)"/)?.[1] || "";
+    if (!id || !target || !/worksheet/i.test(type)) continue;
+    rels.set(id, normalizeWorkbookTarget(target));
+  }
+
+  const sheets = [];
+  for (const match of workbookXml.matchAll(/<(?:[A-Za-z_][\w.-]*:)?sheet\b([^>]*)\/>/g)) {
+    const attrs = match[1];
+    const name = xmlDecodeAttr(attrs.match(/\bname="([^"]*)"/)?.[1]) || `Sheet${sheets.length + 1}`;
+    const relId = attrs.match(/\br:id="([^"]+)"/)?.[1];
+    const fallbackPath = `xl/worksheets/sheet${sheets.length + 1}.xml`;
+    sheets.push({
+      name,
+      path: rels.get(relId) || fallbackPath,
+    });
+  }
+  return sheets;
+}
+
+function ensureWorkbookRelationshipsNamespace(workbookXml, prefix) {
+  if (/\bxmlns:r="http:\/\/schemas\.openxmlformats\.org\/officeDocument\/2006\/relationships"/i.test(workbookXml)) {
+    return workbookXml;
+  }
+  const p = escapeRegExp(prefix);
+  return workbookXml.replace(new RegExp(`(<${p}workbook\\b[^>]*)(>)`, "i"), '$1 xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"$2');
+}
+
+function ensureTemplateWorkbookView(workbookXml, prefix) {
+  const p = escapeRegExp(prefix);
+  if (new RegExp(`<${p}bookViews\\b`, "i").test(workbookXml)) {
+    return workbookXml;
+  }
+  return workbookXml.replace(new RegExp(`(<${p}sheets\\b)`, "i"), `<${tagName(prefix, "bookViews")}><${tagName(prefix, "workbookView")} activeTab="0"/></${tagName(prefix, "bookViews")}>$1`);
+}
+
+function ensureTemplateWorkbookPrintAreas(workbookXml, sheets, prefix) {
+  const p = escapeRegExp(prefix);
+  const definedNames = sheets
+    .map(
+      (sheet, index) =>
+        `<${tagName(prefix, "definedName")} name="_xlnm.Print_Area" localSheetId="${index}">${xmlEscape(excelSheetNameReference(sheet.name))}</${tagName(prefix, "definedName")}>`,
+    )
+    .join("");
+
+  if (new RegExp(`<${p}definedNames\\b[^>]*>[\\s\\S]*?<\\/${p}definedNames>`, "i").test(workbookXml)) {
+    return workbookXml.replace(new RegExp(`<${p}definedNames\\b[^>]*>[\\s\\S]*?<\\/${p}definedNames>`, "i"), (block) => {
+      const withoutPrintAreas = block.replace(
+        new RegExp(`<${p}definedName\\b(?=[^>]*\\bname="_xlnm\\.Print_Area")[^>]*>[\\s\\S]*?<\\/${p}definedName>`, "gi"),
+        "",
+      );
+      return withoutPrintAreas.replace(new RegExp(`(<\\/${p}definedNames>)`, "i"), `${definedNames}$1`);
+    });
+  }
+
+  return workbookXml.replace(new RegExp(`(<\\/${p}workbook>)`, "i"), `<${tagName(prefix, "definedNames")}>${definedNames}</${tagName(prefix, "definedNames")}>$1`);
+}
+
+function replaceTemplateWorkbookSheetsXml(workbookXml, sheets) {
+  const prefix = xmlPrefix(workbookXml, "workbook");
+  const p = escapeRegExp(prefix);
+  const sheetNodes = sheets
+    .map((sheet, index) => `<${tagName(prefix, "sheet")} name="${xmlAttr(sheet.name)}" sheetId="${index + 1}" r:id="rIdProfile${index + 1}"/>`)
+    .join("");
+  const sheetsXml = `<${tagName(prefix, "sheets")}>${sheetNodes}</${tagName(prefix, "sheets")}>`;
+
+  workbookXml = ensureWorkbookRelationshipsNamespace(workbookXml, prefix);
+  if (new RegExp(`<${p}sheets\\b[^>]*>[\\s\\S]*?<\\/${p}sheets>`, "i").test(workbookXml)) {
+    workbookXml = workbookXml.replace(new RegExp(`<${p}sheets\\b[^>]*>[\\s\\S]*?<\\/${p}sheets>`, "i"), sheetsXml);
+  } else {
+    workbookXml = workbookXml.replace(new RegExp(`(<\\/${p}workbook>)`, "i"), `${sheetsXml}$1`);
+  }
+
+  return ensureTemplateWorkbookPrintAreas(ensureTemplateWorkbookView(workbookXml, prefix), sheets, prefix);
+}
+
+function templateWorkbookRelsXml(relsXml, sheetCount) {
+  const sheetRels = Array.from(
+    { length: sheetCount },
+    (_, index) =>
+      `<Relationship Id="rIdProfile${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${index + 1}.xml"/>`,
+  ).join("");
+  const cleaned = relsXml
+    .replace(/<(?:[A-Za-z_][\w.-]*:)?Relationship\b(?=[^>]*\bType="[^"]*worksheet")[^>]*\/>/gi, "")
+    .replace(/<(?:[A-Za-z_][\w.-]*:)?Relationship\b(?=[^>]*\bType="[^"]*calcChain")[^>]*\/>/gi, "");
+  return cleaned.replace(/(<\/(?:[A-Za-z_][\w.-]*:)?Relationships>)/i, `${sheetRels}$1`);
+}
+
+function templateContentTypesXml(contentXml, sheetCount) {
+  const sheetOverrides = Array.from(
+    { length: sheetCount },
+    (_, index) =>
+      `<Override PartName="/xl/worksheets/sheet${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`,
+  ).join("");
+  const cleaned = contentXml
+    .replace(/<(?:[A-Za-z_][\w.-]*:)?Override\b(?=[^>]*\bPartName="\/xl\/worksheets\/[^"]+\.xml")[^>]*\/>/gi, "")
+    .replace(/<(?:[A-Za-z_][\w.-]*:)?Override\b(?=[^>]*\bPartName="\/xl\/calcChain\.xml")[^>]*\/>/gi, "");
+  return cleaned.replace(/(<\/(?:[A-Za-z_][\w.-]*:)?Types>)/i, `${sheetOverrides}$1`);
+}
+
+function fillTemplateWorksheetXml(sheetXml, profile) {
+  let xml = sheetXml;
+  for (const [ref, value] of Object.entries(profileTemplateCells(profile))) {
+    xml = setTemplateCell(xml, ref, value);
+  }
+  return ensureTemplateSheetOutputSettings(xml);
+}
+
+async function createWorkbookFromTemplate(records, templateSource) {
+  const templateBytes = templateSource.bytes || (await templateSource.arrayBuffer());
+  const zip = await JSZip.loadAsync(templateBytes);
+  const workbookFile = zip.file("xl/workbook.xml");
+  const relsFile = zip.file("xl/_rels/workbook.xml.rels");
+  const contentTypesFile = zip.file("[Content_Types].xml");
+  const stylesFile = zip.file("xl/styles.xml");
+
+  if (!workbookFile || !relsFile || !contentTypesFile || !stylesFile) {
+    throw new Error("The uploaded template is not a valid .xlsx workbook.");
+  }
+
+  const workbookXmlText = await workbookFile.async("string");
+  const relsXmlText = await relsFile.async("string");
+  const workbookSheets = parseWorkbookSheets(workbookXmlText, relsXmlText);
+  const baseSheetPath = workbookSheets[0]?.path || "xl/worksheets/sheet1.xml";
+  const baseSheetFile = zip.file(baseSheetPath);
+  if (!baseSheetFile) {
+    throw new Error("The uploaded template does not contain a usable first sheet.");
+  }
+
+  const baseSheetXml = await baseSheetFile.async("string");
+  const usedNames = new Set();
+  const sheets = records.map((record) => ({
+    name: makeSheetName(record.sourceName, usedNames),
+    profile: record.profile,
+  }));
+
+  Object.keys(zip.files).forEach((name) => {
+    if (/^xl\/worksheets\/sheet\d+\.xml$/i.test(name) || /^xl\/worksheets\/_rels\/sheet\d+\.xml\.rels$/i.test(name)) {
+      zip.remove(name);
+    }
+  });
+  zip.remove("xl/calcChain.xml");
+
+  sheets.forEach((sheet, index) => {
+    zip.file(`xl/worksheets/sheet${index + 1}.xml`, fillTemplateWorksheetXml(baseSheetXml, sheet.profile));
+  });
+
+  zip.file("xl/workbook.xml", replaceTemplateWorkbookSheetsXml(workbookXmlText, sheets));
+  zip.file("xl/_rels/workbook.xml.rels", templateWorkbookRelsXml(relsXmlText, sheets.length));
+  zip.file("[Content_Types].xml", templateContentTypesXml(await contentTypesFile.async("string"), sheets.length));
+  zip.file("xl/styles.xml", normalizeTemplateStylesXml(await stylesFile.async("string")));
+
+  return zip.generateAsync({
+    type: "blob",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  });
+}
+
+async function createProfileWorkbookBlob(records, templateSource = null) {
+  if (templateSource) {
+    return createWorkbookFromTemplate(records, templateSource);
+  }
+  return createWorkbookBlob(records);
+}
+
 function makeResultFileName(profile, sourceName, usedNames) {
   const base = safeName([profile.roleCode, profile.candidateName || sourceName, "Profile"].filter(Boolean).join("-"), safeName(sourceName, "profile"));
   let candidate = `${base}.xlsx`;
@@ -1240,6 +1800,16 @@ async function convertCvs() {
   els.convertButton.innerHTML = "Converting";
   setProgress("Processing PDFs", 0, state.files.length);
 
+  let templateSource = null;
+  try {
+    templateSource = await readWorkbookTemplate();
+  } catch (error) {
+    showToast(error.message || "Unable to read template");
+    els.convertButton.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>Convert CVs';
+    updateConvertState();
+    return;
+  }
+
   const usedNames = new Set();
   const results = state.files.map((file) => ({ sourceName: file.name, status: "processing" }));
   renderResults(results);
@@ -1252,7 +1822,7 @@ async function convertCvs() {
     try {
       const text = await extractPdfText(file);
       const profile = parseProfile(text, file.name);
-      const xlsxBlob = await createWorkbookBlob([{ sourceName: file.name, profile }]);
+      const xlsxBlob = await createProfileWorkbookBlob([{ sourceName: file.name, profile }], templateSource);
       const fileName = makeResultFileName(profile, file.name, usedNames);
       const url = createDownloadUrl(xlsxBlob);
 
@@ -1278,7 +1848,7 @@ async function convertCvs() {
   }
 
   if (successful.length && els.combinedWorkbook.checked) {
-    const combinedBlob = await createWorkbookBlob(successful);
+    const combinedBlob = await createProfileWorkbookBlob(successful, templateSource);
     const combinedUrl = createDownloadUrl(combinedBlob);
     setDownloadLink(els.downloadCombined, combinedUrl);
   }
@@ -1286,7 +1856,7 @@ async function convertCvs() {
   if (successful.length) {
     addPipelineRecords(successful);
     if (els.combinedWorkbook.checked) {
-      const combinedForZip = await createWorkbookBlob(successful);
+      const combinedForZip = await createProfileWorkbookBlob(successful, templateSource);
       zip.file("combined-cv-profiles.xlsx", combinedForZip);
     }
     const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
@@ -1302,8 +1872,16 @@ async function convertCvs() {
 
 els.chooseFiles.addEventListener("click", () => els.pdfFiles.click());
 els.chooseFolder.addEventListener("click", () => els.pdfFolder.click());
+els.chooseTemplate.addEventListener("click", () => els.templateFile.click());
 els.pdfFiles.addEventListener("change", () => addFiles(els.pdfFiles.files));
 els.pdfFolder.addEventListener("change", () => addFiles(els.pdfFolder.files));
+els.templateFile.addEventListener("change", () => handleTemplateFile(els.templateFile.files));
+els.clearTemplate.addEventListener("click", () => {
+  state.templateFile = null;
+  els.templateFile.value = "";
+  updateTemplateUi();
+  showToast("Default template selected");
+});
 els.convertButton.addEventListener("click", convertCvs);
 els.createPlan?.addEventListener("click", () => {
   state.taskPlan = createWorkflowPlan(els.workflowPreset.value, els.taskPrompt.value);
@@ -1367,6 +1945,7 @@ document.querySelectorAll?.("[data-recipe]").forEach((button) => {
 els.dropzone.addEventListener("drop", (event) => addFiles(event.dataTransfer.files));
 
 window.addEventListener("load", updateConvertState);
+updateTemplateUi();
 loadPipeline();
 renderPipeline();
 renderTaskPlan();

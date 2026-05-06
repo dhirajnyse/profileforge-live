@@ -32,7 +32,7 @@
       <section class="panel setup-panel">
         <div class="panel-heading">
           <h2>Input</h2>
-          <span class="format-pill">Built-in Profile Template</span>
+          <span class="format-pill" id="templateModePill">Built-in Profile Template</span>
         </div>
 
         <div class="dropzone" id="dropzone">
@@ -56,6 +56,21 @@
         </div>
 
         <div class="selected-list" id="selectedList"></div>
+
+        <div class="template-card">
+          <input id="templateFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+          <div>
+            <strong>Excel template</strong>
+            <small id="templateStatus">Default ProfileForge template</small>
+          </div>
+          <div class="template-actions">
+            <button type="button" class="secondary" id="chooseTemplate">
+              <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>
+              Template
+            </button>
+            <button type="button" class="secondary subtle" id="clearTemplate" hidden>Default</button>
+          </div>
+        </div>
 
         <label class="option-row">
           <input id="combinedWorkbook" type="checkbox" checked />
@@ -288,6 +303,6 @@
     </section>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=20260506-screening"></script>
+    <script src="./app.js?v=20260506-custom-template"></script>
   </body>
 </html>

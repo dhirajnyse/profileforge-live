@@ -593,6 +593,46 @@ button,
   color: var(--red);
 }
 
+.template-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.template-card input {
+  display: none;
+}
+
+.template-card strong,
+.template-card small {
+  display: block;
+}
+
+.template-card small {
+  margin-top: 3px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.template-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.secondary.subtle {
+  color: var(--muted);
+  border-color: var(--line);
+  background: #fff;
+}
+
 .option-row {
   display: grid;
   grid-template-columns: 20px 1fr;
@@ -791,5 +831,13 @@ tr:last-child td {
 
   .recipe-strip {
     grid-template-columns: 1fr;
+  }
+
+  .template-card {
+    grid-template-columns: 1fr;
+  }
+
+  .template-actions {
+    justify-content: flex-start;
   }
 }

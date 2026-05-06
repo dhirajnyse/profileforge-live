@@ -12,6 +12,10 @@ const PROFILE_FIELDS = [
   { id: "note", label: "Note", defaultCell: "C13" },
 ];
 
+const LONG_REVIEW_FIELDS = new Set(["relevantExperience", "keySkills", "projectsHandled", "note"]);
+const PROFILE_NOTE =
+  "We can provide detailed CV as there is a limited space in this format for projects listing, so we mentioned recent ones";
+
 const DEFAULT_TEMPLATE_MAPPING = PROFILE_FIELDS.reduce((mapping, field) => {
   mapping[field.id] = field.defaultCell;
   return mapping;
@@ -21,6 +25,7 @@ const state = {
   files: [],
   templateFile: null,
   templateMapping: { ...DEFAULT_TEMPLATE_MAPPING },
+  reviewItems: [],
   objectUrls: [],
   pipeline: [],
   taskPlan: [],
@@ -39,6 +44,7 @@ const els = {
   saveMapping: document.querySelector("#saveMapping"),
   resetMapping: document.querySelector("#resetMapping"),
   combinedWorkbook: document.querySelector("#combinedWorkbook"),
+  reviewBeforeExcel: document.querySelector("#reviewBeforeExcel"),
   chooseFiles: document.querySelector("#chooseFiles"),
   chooseFolder: document.querySelector("#chooseFolder"),
   chooseTemplate: document.querySelector("#chooseTemplate"),
@@ -50,6 +56,11 @@ const els = {
   jobStatus: document.querySelector("#jobStatus"),
   jobCounts: document.querySelector("#jobCounts"),
   progressFill: document.querySelector("#progressFill"),
+  reviewPanel: document.querySelector("#reviewPanel"),
+  reviewSummary: document.querySelector("#reviewSummary"),
+  reviewList: document.querySelector("#reviewList"),
+  generateReviewed: document.querySelector("#generateReviewed"),
+  clearReview: document.querySelector("#clearReview"),
   resultsBody: document.querySelector("#resultsBody"),
   downloadCombined: document.querySelector("#downloadCombined"),
   downloadZip: document.querySelector("#downloadZip"),
@@ -117,6 +128,14 @@ function setProgress(message, completed, total) {
   els.jobStatus.textContent = message;
   els.jobCounts.textContent = `${completed} / ${total}`;
   els.progressFill.style.width = `${percent}%`;
+}
+
+function convertButtonHtml(label) {
+  return `<svg viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>${label}`;
+}
+
+function setConvertButtonReadyText() {
+  els.convertButton.innerHTML = convertButtonHtml(els.reviewBeforeExcel.checked ? "Review CVs" : "Convert CVs");
 }
 
 function clearObjectUrls() {
@@ -812,6 +831,9 @@ function renderSelectedFiles() {
 function updateConvertState() {
   const librariesReady = Boolean(window.JSZip && window.pdfjsLib);
   els.convertButton.disabled = !librariesReady || !state.files.length;
+  if (!els.convertButton.dataset?.busy) {
+    setConvertButtonReadyText();
+  }
   if (!librariesReady) {
     els.appStatus.textContent = "Libraries loading";
   }
@@ -1086,7 +1108,7 @@ function profileTable(profile) {
     [9, "Previous Employer", profile.previousEmployer],
     [10, "Projects Handled", profile.projectsHandled],
     [null, null, null],
-    [null, "Note: ", "We can provide detailed CV as there is a limited space in this format for projects listing, so we mentioned recent ones"],
+    [null, "Note: ", profile.note || PROFILE_NOTE],
   ];
 }
 
@@ -1392,7 +1414,7 @@ function profileFieldValues(profile) {
     educationalQualifications: profile.educationalQualifications,
     previousEmployer: profile.previousEmployer,
     projectsHandled: profile.projectsHandled,
-    note: "We can provide detailed CV as there is a limited space in this format for projects listing, so we mentioned recent ones",
+    note: profile.note || PROFILE_NOTE,
   };
 }
 
@@ -1917,6 +1939,84 @@ function statusBadge(status) {
   return `<span class="badge ${status}">${status}</span>`;
 }
 
+function renderReviewPanel() {
+  if (!state.reviewItems.length) {
+    els.reviewPanel.hidden = true;
+    els.reviewSummary.textContent = "No profiles ready";
+    els.reviewList.innerHTML = "";
+    els.generateReviewed.disabled = true;
+    return;
+  }
+
+  const ready = state.reviewItems.filter((item) => item.status === "ready").length;
+  const failed = state.reviewItems.length - ready;
+  els.reviewPanel.hidden = false;
+  els.reviewSummary.textContent = `${ready} profile${ready === 1 ? "" : "s"} ready${failed ? `, ${failed} failed` : ""}`;
+  els.generateReviewed.disabled = ready === 0;
+
+  els.reviewList.innerHTML = state.reviewItems
+    .map((item, index) => {
+      if (item.status === "error") {
+        return `
+          <article class="review-card error-card">
+            <div class="review-card-head">
+              <strong>${escapeHtml(item.sourceName)}</strong>
+              ${statusBadge("error")}
+            </div>
+            <p>${escapeHtml(item.error || "Unable to extract this PDF.")}</p>
+          </article>
+        `;
+      }
+
+      return `
+        <article class="review-card" data-review-index="${index}">
+          <div class="review-card-head">
+            <strong>${escapeHtml(item.sourceName)}</strong>
+            ${statusBadge("done")}
+          </div>
+          <div class="review-fields">
+            ${PROFILE_FIELDS.map((field) => {
+              const value = profileFieldValues(item.profile)[field.id] || "";
+              const control = LONG_REVIEW_FIELDS.has(field.id)
+                ? `<textarea data-review-field="${escapeHtml(field.id)}" rows="${field.id === "projectsHandled" ? 4 : 3}">${escapeHtml(value)}</textarea>`
+                : `<input data-review-field="${escapeHtml(field.id)}" type="text" value="${escapeHtml(value)}" />`;
+              return `
+                <label class="review-field">
+                  <span>${escapeHtml(field.label)}</span>
+                  ${control}
+                </label>
+              `;
+            }).join("")}
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function collectReviewedRecords() {
+  return state.reviewItems
+    .map((item, index) => {
+      if (item.status !== "ready") return null;
+      const card = els.reviewList.querySelector(`[data-review-index="${index}"]`);
+      const profile = { ...item.profile };
+      for (const field of PROFILE_FIELDS) {
+        const input = card?.querySelector(`[data-review-field="${field.id}"]`);
+        if (input) {
+          profile[field.id] = String(input.value || "").trim();
+        }
+      }
+      profile.note = profile.note || PROFILE_NOTE;
+      return { sourceName: item.sourceName, profile };
+    })
+    .filter(Boolean);
+}
+
+function clearReviewQueue() {
+  state.reviewItems = [];
+  renderReviewPanel();
+}
+
 function renderResults(results) {
   if (!results.length) {
     els.resultsBody.innerHTML = '<tr class="empty-row"><td colspan="5">Awaiting conversion</td></tr>';
@@ -1944,7 +2044,7 @@ function renderResults(results) {
     .join("");
 }
 
-async function convertCvs() {
+async function extractProfilesForReview() {
   if (!window.JSZip || !window.pdfjsLib) {
     showToast("Libraries are still loading. Try again in a moment.");
     return;
@@ -1953,6 +2053,56 @@ async function convertCvs() {
   clearObjectUrls();
   setDownloadLink(els.downloadCombined, null);
   setDownloadLink(els.downloadZip, null);
+  state.reviewItems = [];
+  renderReviewPanel();
+  renderResults([]);
+  els.convertButton.dataset.busy = "true";
+  els.convertButton.disabled = true;
+  els.convertButton.innerHTML = "Extracting";
+  setProgress("Extracting PDFs", 0, state.files.length);
+
+  for (let index = 0; index < state.files.length; index += 1) {
+    const file = state.files[index];
+    try {
+      const text = await extractPdfText(file);
+      const profile = parseProfile(text, file.name);
+      profile.note = profile.note || PROFILE_NOTE;
+      state.reviewItems.push({
+        id: `${Date.now()}-${index}-${Math.random().toString(16).slice(2)}`,
+        status: "ready",
+        sourceName: file.name,
+        profile,
+      });
+    } catch (error) {
+      state.reviewItems.push({
+        id: `${Date.now()}-${index}-${Math.random().toString(16).slice(2)}`,
+        status: "error",
+        sourceName: file.name,
+        error: error.message,
+      });
+    }
+    renderReviewPanel();
+    setProgress("Extracting PDFs", index + 1, state.files.length);
+  }
+
+  const ready = state.reviewItems.filter((item) => item.status === "ready").length;
+  const failed = state.reviewItems.length - ready;
+  setProgress(failed ? "Review ready with errors" : "Ready for review", state.files.length, state.files.length);
+  showToast(ready ? `${ready} profile${ready === 1 ? "" : "s"} ready to review` : "No profiles extracted");
+  delete els.convertButton.dataset.busy;
+  updateConvertState();
+}
+
+async function convertFilesDirectly() {
+  if (!window.JSZip || !window.pdfjsLib) {
+    showToast("Libraries are still loading. Try again in a moment.");
+    return;
+  }
+
+  clearObjectUrls();
+  setDownloadLink(els.downloadCombined, null);
+  setDownloadLink(els.downloadZip, null);
+  els.convertButton.dataset.busy = "true";
   els.convertButton.disabled = true;
   els.convertButton.innerHTML = "Converting";
   setProgress("Processing PDFs", 0, state.files.length);
@@ -1962,7 +2112,7 @@ async function convertCvs() {
     templateSource = await readWorkbookTemplate();
   } catch (error) {
     showToast(error.message || "Unable to read template");
-    els.convertButton.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>Convert CVs';
+    delete els.convertButton.dataset.busy;
     updateConvertState();
     return;
   }
@@ -2023,8 +2173,99 @@ async function convertCvs() {
   const failed = results.filter((result) => result.status === "error").length;
   setProgress(failed ? "Completed with errors" : "Complete", state.files.length, state.files.length);
   showToast(failed ? "Completed with errors" : "Conversion complete");
-  els.convertButton.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>Convert CVs';
+  delete els.convertButton.dataset.busy;
   updateConvertState();
+}
+
+async function generateReviewedExcel() {
+  const records = collectReviewedRecords();
+  if (!records.length) {
+    showToast("No reviewed profiles ready");
+    return;
+  }
+
+  clearObjectUrls();
+  setDownloadLink(els.downloadCombined, null);
+  setDownloadLink(els.downloadZip, null);
+  els.generateReviewed.disabled = true;
+  els.generateReviewed.dataset.busy = "true";
+  els.generateReviewed.innerHTML = "Generating";
+  setProgress("Generating Excel", 0, records.length);
+
+  let templateSource = null;
+  try {
+    templateSource = await readWorkbookTemplate();
+  } catch (error) {
+    showToast(error.message || "Unable to read template");
+    delete els.generateReviewed.dataset.busy;
+    els.generateReviewed.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>Generate Excel';
+    renderReviewPanel();
+    return;
+  }
+
+  const usedNames = new Set();
+  const results = records.map((record) => ({ sourceName: record.sourceName, status: "processing" }));
+  const successful = [];
+  const zip = new JSZip();
+  renderResults(results);
+
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index];
+    try {
+      const xlsxBlob = await createProfileWorkbookBlob([record], templateSource);
+      const fileName = makeResultFileName(record.profile, record.sourceName, usedNames);
+      const url = createDownloadUrl(xlsxBlob);
+
+      zip.file(fileName, xlsxBlob);
+      successful.push(record);
+      Object.assign(results[index], {
+        status: "done",
+        candidateName: record.profile.candidateName,
+        roleCode: record.profile.roleCode,
+        roleTitle: record.profile.roleTitle,
+        yearsOfExperience: record.profile.yearsOfExperience,
+        fileName,
+        url,
+      });
+    } catch (error) {
+      Object.assign(results[index], {
+        status: "error",
+        error: error.message,
+      });
+    }
+    renderResults(results);
+    setProgress("Generating Excel", index + 1, records.length);
+  }
+
+  if (successful.length && els.combinedWorkbook.checked) {
+    const combinedBlob = await createProfileWorkbookBlob(successful, templateSource);
+    setDownloadLink(els.downloadCombined, createDownloadUrl(combinedBlob));
+  }
+
+  if (successful.length) {
+    addPipelineRecords(successful);
+    if (els.combinedWorkbook.checked) {
+      const combinedForZip = await createProfileWorkbookBlob(successful, templateSource);
+      zip.file("combined-cv-profiles.xlsx", combinedForZip);
+    }
+    const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+    setDownloadLink(els.downloadZip, createDownloadUrl(zipBlob));
+  }
+
+  const failed = results.filter((result) => result.status === "error").length;
+  setProgress(failed ? "Completed with errors" : "Complete", records.length, records.length);
+  showToast(failed ? "Completed with errors" : "Excel files ready");
+  delete els.generateReviewed.dataset.busy;
+  els.generateReviewed.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>Generate Excel';
+  renderReviewPanel();
+}
+
+async function convertCvs() {
+  if (els.reviewBeforeExcel.checked) {
+    await extractProfilesForReview();
+    return;
+  }
+  await convertFilesDirectly();
 }
 
 els.chooseFiles.addEventListener("click", () => els.pdfFiles.click());
@@ -2032,6 +2273,7 @@ els.chooseFolder.addEventListener("click", () => els.pdfFolder.click());
 els.chooseTemplate.addEventListener("click", () => els.templateFile.click());
 els.pdfFiles.addEventListener("change", () => addFiles(els.pdfFiles.files));
 els.pdfFolder.addEventListener("change", () => addFiles(els.pdfFolder.files));
+els.reviewBeforeExcel.addEventListener("change", updateConvertState);
 els.templateFile.addEventListener("change", () => handleTemplateFile(els.templateFile.files));
 els.clearTemplate.addEventListener("click", () => {
   state.templateFile = null;
@@ -2045,6 +2287,11 @@ els.resetMapping.addEventListener("click", () => {
   saveTemplateMapping(state.templateMapping);
   renderTemplateMapper();
   showToast("Template mapping reset");
+});
+els.generateReviewed.addEventListener("click", generateReviewedExcel);
+els.clearReview.addEventListener("click", () => {
+  clearReviewQueue();
+  showToast("Review queue cleared");
 });
 els.convertButton.addEventListener("click", convertCvs);
 els.createPlan?.addEventListener("click", () => {

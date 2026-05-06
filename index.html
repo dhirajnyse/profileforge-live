@@ -94,9 +94,17 @@
           </span>
         </label>
 
+        <label class="option-row">
+          <input id="reviewBeforeExcel" type="checkbox" checked />
+          <span>
+            <strong>Review extracted fields before Excel</strong>
+            <small>Edit profile details first, then generate the workbook</small>
+          </span>
+        </label>
+
         <button type="button" class="primary" id="convertButton" disabled>
           <svg viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>
-          Convert CVs
+          Review CVs
         </button>
       </section>
 
@@ -123,6 +131,23 @@
           <div class="progress-track">
             <div class="progress-fill" id="progressFill"></div>
           </div>
+        </div>
+
+        <div class="review-panel" id="reviewPanel" hidden>
+          <div class="review-heading">
+            <div>
+              <h3>Review Before Excel</h3>
+              <p id="reviewSummary">No profiles ready</p>
+            </div>
+            <div class="review-actions">
+              <button type="button" class="secondary subtle" id="clearReview">Clear</button>
+              <button type="button" class="primary compact" id="generateReviewed" disabled>
+                <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>
+                Generate Excel
+              </button>
+            </div>
+          </div>
+          <div class="review-list" id="reviewList"></div>
         </div>
 
         <div class="table-wrap">
@@ -317,6 +342,6 @@
     </section>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=20260506-template-mapper"></script>
+    <script src="./app.js?v=20260506-review-before-excel"></script>
   </body>
 </html>

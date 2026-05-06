@@ -1,6 +1,8 @@
 const state = {
   files: [],
   objectUrls: [],
+  pipeline: [],
+  taskPlan: [],
 };
 
 const els = {
@@ -20,6 +22,17 @@ const els = {
   resultsBody: document.querySelector("#resultsBody"),
   downloadCombined: document.querySelector("#downloadCombined"),
   downloadZip: document.querySelector("#downloadZip"),
+  metricProfiles: document.querySelector("#metricProfiles"),
+  metricShortlist: document.querySelector("#metricShortlist"),
+  metricFollowups: document.querySelector("#metricFollowups"),
+  workflowPreset: document.querySelector("#workflowPreset"),
+  taskPrompt: document.querySelector("#taskPrompt"),
+  createPlan: document.querySelector("#createPlan"),
+  taskBoard: document.querySelector("#taskBoard"),
+  pipelineBody: document.querySelector("#pipelineBody"),
+  exportPipeline: document.querySelector("#exportPipeline"),
+  copyBrief: document.querySelector("#copyBrief"),
+  clearPipeline: document.querySelector("#clearPipeline"),
   toast: document.querySelector("#toast"),
 };
 
@@ -88,6 +101,290 @@ function setDownloadLink(element, url) {
   element.href = "#";
   element.classList.add("disabled");
   element.setAttribute("aria-disabled", "true");
+}
+
+function storageGet(key, fallback) {
+  try {
+    const raw = window.localStorage?.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function storageSet(key, value) {
+  try {
+    window.localStorage?.setItem(key, JSON.stringify(value));
+  } catch {
+    // Local storage can be blocked in private browser contexts.
+  }
+}
+
+function downloadTextFile(fileName, content, type = "text/plain") {
+  const blob = new Blob([content], { type });
+  const link = document.createElement("a");
+  link.href = createDownloadUrl(blob);
+  link.download = fileName;
+  link.click();
+}
+
+async function copyText(value) {
+  const text = String(value || "");
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const input = document.createElement("textarea");
+  input.value = text;
+  document.body.appendChild(input);
+  input.select();
+  document.execCommand("copy");
+  input.remove();
+}
+
+function parseYearsNumber(value) {
+  const match = String(value || "").match(/\d+/);
+  return match ? Number(match[0]) : 0;
+}
+
+function candidateScore(profile) {
+  const years = Math.min(parseYearsNumber(profile.yearsOfExperience), 15);
+  const skills = String(profile.keySkills || "")
+    .split(/[,;|]/)
+    .map((item) => item.trim())
+    .filter(Boolean).length;
+  const details = ["certifications", "educationalQualifications", "previousEmployer", "projectsHandled"].filter((key) => {
+    const value = String(profile[key] || "");
+    return value && !/not specified/i.test(value);
+  }).length;
+  return Math.min(98, Math.max(42, 42 + years * 3 + Math.min(skills, 12) * 2 + details * 4));
+}
+
+function nextBusinessDate(offsetDays = 1) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  while ([0, 6].includes(date.getDay())) {
+    date.setDate(date.getDate() + 1);
+  }
+  return date.toISOString().slice(0, 10);
+}
+
+function pipelineKey(item) {
+  return `${item.sourceName || ""}:${item.candidateName || ""}:${item.roleCode || ""}`.toLowerCase();
+}
+
+function makePipelineItem(record) {
+  const profile = record.profile;
+  const score = candidateScore(profile);
+  return {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    sourceName: record.sourceName,
+    candidateName: profile.candidateName || "Candidate",
+    roleCode: profile.roleCode || "",
+    roleTitle: profile.roleTitle || "",
+    yearsOfExperience: profile.yearsOfExperience || "",
+    keySkills: profile.keySkills || "",
+    score,
+    status: score >= 78 ? "Shortlist" : "Review",
+    nextStep: score >= 78 ? "Prepare client submission pack" : "Verify CV details and role match",
+    dueDate: nextBusinessDate(score >= 78 ? 1 : 2),
+  };
+}
+
+function addPipelineRecords(records) {
+  const existing = new Set(state.pipeline.map(pipelineKey));
+  let added = 0;
+  for (const record of records) {
+    const item = makePipelineItem(record);
+    const key = pipelineKey(item);
+    if (existing.has(key)) continue;
+    state.pipeline.push(item);
+    existing.add(key);
+    added += 1;
+  }
+  if (added) {
+    savePipeline();
+    renderPipeline();
+    showToast(`${added} candidate${added === 1 ? "" : "s"} added to pipeline`);
+  }
+}
+
+function savePipeline() {
+  storageSet("profileforge.pipeline.v1", state.pipeline);
+}
+
+function loadPipeline() {
+  state.pipeline = storageGet("profileforge.pipeline.v1", []);
+}
+
+function statusOptions(selected) {
+  return ["Review", "Shortlist", "Interview", "Submitted", "Hold", "Rejected"]
+    .map((status) => `<option value="${status}"${status === selected ? " selected" : ""}>${status}</option>`)
+    .join("");
+}
+
+function renderPipeline() {
+  if (!els.pipelineBody) return;
+  if (!state.pipeline.length) {
+    els.pipelineBody.innerHTML = '<tr class="empty-row"><td colspan="5">Awaiting converted profiles</td></tr>';
+  } else {
+    els.pipelineBody.innerHTML = state.pipeline
+      .map(
+        (item) => `
+          <tr>
+            <td>
+              <strong>${escapeHtml(item.candidateName)}</strong>
+              <div class="next-step">${escapeHtml(item.yearsOfExperience || "Years not listed")}</div>
+            </td>
+            <td>
+              ${escapeHtml([item.roleCode, item.roleTitle].filter(Boolean).join(" - "))}
+              <div class="next-step">${escapeHtml(trimToWords(item.keySkills || "", 95))}</div>
+            </td>
+            <td><span class="score-pill">${item.score}</span></td>
+            <td>
+              <select class="pipeline-status" data-id="${escapeHtml(item.id)}">
+                ${statusOptions(item.status)}
+              </select>
+            </td>
+            <td>
+              <div>${escapeHtml(item.nextStep)}</div>
+              <div class="next-step">${escapeHtml(item.dueDate)}</div>
+            </td>
+          </tr>
+        `,
+      )
+      .join("");
+  }
+
+  const shortlist = state.pipeline.filter((item) => ["Shortlist", "Interview", "Submitted"].includes(item.status)).length;
+  const followups = state.pipeline.filter((item) => !["Rejected", "Hold"].includes(item.status)).length;
+  if (els.metricProfiles) els.metricProfiles.textContent = String(state.pipeline.length);
+  if (els.metricShortlist) els.metricShortlist.textContent = String(shortlist);
+  if (els.metricFollowups) els.metricFollowups.textContent = String(followups);
+  if (els.exportPipeline) els.exportPipeline.disabled = !state.pipeline.length;
+  if (els.copyBrief) els.copyBrief.disabled = !state.pipeline.length;
+  if (els.clearPipeline) els.clearPipeline.disabled = !state.pipeline.length;
+}
+
+function updatePipelineStatus(id, status) {
+  const item = state.pipeline.find((candidate) => candidate.id === id);
+  if (!item) return;
+  item.status = status;
+  item.nextStep =
+    {
+      Review: "Verify CV details and role match",
+      Shortlist: "Prepare client submission pack",
+      Interview: "Schedule panel and prepare questions",
+      Submitted: "Track client feedback",
+      Hold: "Revisit after role calibration",
+      Rejected: "Archive with reason",
+    }[status] || item.nextStep;
+  savePipeline();
+  renderPipeline();
+}
+
+function pipelineCsv() {
+  const headers = ["Candidate", "Role Code", "Role Title", "Years", "Score", "Status", "Next Step", "Due Date", "Source"];
+  const rows = state.pipeline.map((item) => [
+    item.candidateName,
+    item.roleCode,
+    item.roleTitle,
+    item.yearsOfExperience,
+    item.score,
+    item.status,
+    item.nextStep,
+    item.dueDate,
+    item.sourceName,
+  ]);
+  return [headers, ...rows]
+    .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+}
+
+function dailyBrief() {
+  if (!state.pipeline.length) return "No candidates in pipeline.";
+  const lines = state.pipeline
+    .slice()
+    .sort((a, b) => b.score - a.score)
+    .map((item, index) => `${index + 1}. ${item.candidateName} - ${item.roleCode || item.roleTitle || "Role"} - ${item.status} - score ${item.score} - ${item.nextStep}`);
+  return [`ProfileForge Daily Brief`, `Candidates: ${state.pipeline.length}`, "", ...lines].join("\n");
+}
+
+const workflowTemplates = {
+  shortlist: [
+    ["Review converted profiles", "Open Excel profiles and confirm candidate names, role codes, and missing fields.", "Assistant", 1],
+    ["Rank candidates", "Sort by score, years, and role match; mark strong profiles as Shortlist.", "Recruiter", 1],
+    ["Prepare pack", "Download combined workbook and attach selected individual profiles.", "Assistant", 1],
+    ["Send summary", "Copy daily brief and share shortlist decisions.", "Recruiter", 2],
+  ],
+  interview: [
+    ["Confirm panel", "Assign interviewer and reserve interview slot for shortlisted candidates.", "Recruiter", 1],
+    ["Prepare questions", "Use role title and key skills to draft technical and screening questions.", "Hiring team", 1],
+    ["Share profile", "Send profile workbook and CV notes to the panel.", "Assistant", 1],
+    ["Record feedback", "Update candidate status after the interview.", "Recruiter", 2],
+  ],
+  followup: [
+    ["Check pending candidates", "Filter pipeline for Review, Shortlist, Interview, and Submitted.", "Assistant", 1],
+    ["Send reminders", "Follow up with candidate, client, or panel based on current status.", "Recruiter", 1],
+    ["Update due dates", "Move completed items forward and keep open items visible.", "Assistant", 1],
+    ["Share brief", "Copy daily brief for management update.", "Recruiter", 1],
+  ],
+  client: [
+    ["Select profiles", "Choose candidates marked Shortlist or Interview.", "Recruiter", 1],
+    ["Validate formatting", "Open print preview and confirm one-page profile output.", "Assistant", 1],
+    ["Create submission", "Attach combined workbook and individual Excel profiles.", "Assistant", 1],
+    ["Track response", "Move candidates to Submitted and set feedback follow-up.", "Recruiter", 3],
+  ],
+};
+
+function createWorkflowPlan(preset, prompt) {
+  const template = workflowTemplates[preset] || workflowTemplates.shortlist;
+  const mentionsTomorrow = /tomorrow/i.test(prompt);
+  const urgent = /\burgent|today|asap\b/i.test(prompt);
+  const baseOffset = urgent ? 0 : mentionsTomorrow ? 1 : 1;
+  return template.map(([title, detail, owner, offset], index) => ({
+    title,
+    detail,
+    owner,
+    dueDate: nextBusinessDate(baseOffset + Math.max(0, offset - 1)),
+    priority: urgent || index === 0 ? "High" : "Normal",
+  }));
+}
+
+function renderTaskPlan() {
+  if (!els.taskBoard) return;
+  if (!state.taskPlan.length) {
+    els.taskBoard.innerHTML = '<div class="empty-state">No workflow plan yet</div>';
+    return;
+  }
+  els.taskBoard.innerHTML = state.taskPlan
+    .map(
+      (task) => `
+        <article class="task-card">
+          <strong>${escapeHtml(task.title)}</strong>
+          <p>${escapeHtml(task.detail)}</p>
+          <div class="task-meta">
+            <span>${escapeHtml(task.owner)}</span>
+            <span>${escapeHtml(task.dueDate)}</span>
+            <span>${escapeHtml(task.priority)}</span>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function applyRecipe(recipe) {
+  const prompts = {
+    shortlist: "Prepare tomorrow shortlist pack for converted CVs and flag missing candidate details.",
+    interview: "Prepare interview schedule and question pack for shortlisted candidates.",
+    followup: "Create a follow-up desk for all candidates waiting on client, panel, or recruiter response.",
+    client: "Prepare client submission pack with combined workbook, individual profiles, and summary brief.",
+  };
+  els.workflowPreset.value = recipe;
+  els.taskPrompt.value = prompts[recipe] || prompts.shortlist;
+  state.taskPlan = createWorkflowPlan(recipe, els.taskPrompt.value);
+  renderTaskPlan();
 }
 
 function addFiles(fileList) {
@@ -728,6 +1025,7 @@ async function convertCvs() {
   }
 
   if (successful.length) {
+    addPipelineRecords(successful);
     if (els.combinedWorkbook.checked) {
       const combinedForZip = await createWorkbookBlob(successful);
       zip.file("combined-cv-profiles.xlsx", combinedForZip);
@@ -748,6 +1046,34 @@ els.chooseFolder.addEventListener("click", () => els.pdfFolder.click());
 els.pdfFiles.addEventListener("change", () => addFiles(els.pdfFiles.files));
 els.pdfFolder.addEventListener("change", () => addFiles(els.pdfFolder.files));
 els.convertButton.addEventListener("click", convertCvs);
+els.createPlan?.addEventListener("click", () => {
+  state.taskPlan = createWorkflowPlan(els.workflowPreset.value, els.taskPrompt.value);
+  renderTaskPlan();
+  showToast("Workflow plan ready");
+});
+els.exportPipeline?.addEventListener("click", () => {
+  if (!state.pipeline.length) return;
+  downloadTextFile("profileforge-candidate-pipeline.csv", pipelineCsv(), "text/csv");
+});
+els.copyBrief?.addEventListener("click", async () => {
+  if (!state.pipeline.length) return;
+  await copyText(dailyBrief());
+  showToast("Brief copied");
+});
+els.clearPipeline?.addEventListener("click", () => {
+  state.pipeline = [];
+  savePipeline();
+  renderPipeline();
+  showToast("Pipeline cleared");
+});
+els.pipelineBody?.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!target.matches(".pipeline-status")) return;
+  updatePipelineStatus(target.dataset.id, target.value);
+});
+document.querySelectorAll?.("[data-recipe]").forEach((button) => {
+  button.addEventListener("click", () => applyRecipe(button.dataset.recipe));
+});
 
 ["dragenter", "dragover"].forEach((eventName) => {
   els.dropzone.addEventListener(eventName, (event) => {
@@ -766,4 +1092,7 @@ els.convertButton.addEventListener("click", convertCvs);
 els.dropzone.addEventListener("drop", (event) => addFiles(event.dataTransfer.files));
 
 window.addEventListener("load", updateConvertState);
+loadPipeline();
+renderPipeline();
+renderTaskPlan();
 setTimeout(updateConvertState, 1000);

@@ -21,7 +21,13 @@
       <div class="status-pill ready" id="appStatus">Ready</div>
     </header>
 
-    <main class="workspace">
+    <nav class="app-tabs" aria-label="Workspace">
+      <a href="#converter">Converter</a>
+      <a href="#automationHub">Workflows</a>
+      <a href="#pipelinePanel">Pipeline</a>
+    </nav>
+
+    <main class="workspace" id="converter">
       <section class="panel setup-panel">
         <div class="panel-heading">
           <h2>Input</h2>
@@ -110,7 +116,114 @@
       </section>
     </main>
 
+    <section class="automation-shell" id="automationHub">
+      <div class="panel automation-panel">
+        <div class="panel-heading">
+          <h2>Workflow Desk</h2>
+          <div class="output-actions">
+            <button type="button" class="secondary" id="copyBrief">
+              <svg viewBox="0 0 24 24"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path></svg>
+              Brief
+            </button>
+            <button type="button" class="secondary" id="exportPipeline">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg>
+              CSV
+            </button>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <div class="metric-card">
+            <span>Profiles</span>
+            <strong id="metricProfiles">0</strong>
+          </div>
+          <div class="metric-card">
+            <span>Shortlist</span>
+            <strong id="metricShortlist">0</strong>
+          </div>
+          <div class="metric-card">
+            <span>Follow-ups</span>
+            <strong id="metricFollowups">0</strong>
+          </div>
+        </div>
+
+        <div class="workflow-grid">
+          <section class="workflow-compose">
+            <div class="field-stack">
+              <label for="workflowPreset">Workflow</label>
+              <select id="workflowPreset">
+                <option value="shortlist">Shortlist pack</option>
+                <option value="interview">Interview prep</option>
+                <option value="followup">Follow-up desk</option>
+                <option value="client">Client submission</option>
+              </select>
+            </div>
+            <div class="field-stack">
+              <label for="taskPrompt">Task</label>
+              <textarea id="taskPrompt" rows="5">Prepare tomorrow shortlist pack for converted CVs and flag missing candidate details.</textarea>
+            </div>
+            <button type="button" class="primary compact-primary" id="createPlan">
+              <svg viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>
+              Create plan
+            </button>
+          </section>
+
+          <section class="recipe-strip" aria-label="Workflow recipes">
+            <button type="button" class="recipe-card" data-recipe="shortlist">
+              <strong>Shortlist Pack</strong>
+              <span>Review, rank, submit</span>
+            </button>
+            <button type="button" class="recipe-card" data-recipe="interview">
+              <strong>Interview Prep</strong>
+              <span>Questions, panel, calendar</span>
+            </button>
+            <button type="button" class="recipe-card" data-recipe="followup">
+              <strong>Follow-up Desk</strong>
+              <span>Pending replies, reminders</span>
+            </button>
+            <button type="button" class="recipe-card" data-recipe="client">
+              <strong>Client Submission</strong>
+              <span>Profiles, summary, send</span>
+            </button>
+          </section>
+        </div>
+
+        <div class="task-board" id="taskBoard">
+          <div class="empty-state">No workflow plan yet</div>
+        </div>
+      </div>
+
+      <div class="panel pipeline-panel" id="pipelinePanel">
+        <div class="panel-heading">
+          <h2>Candidate Pipeline</h2>
+          <button type="button" class="secondary" id="clearPipeline">
+            <svg viewBox="0 0 24 24"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 16h10l1-16"></path></svg>
+            Clear
+          </button>
+        </div>
+
+        <div class="table-wrap pipeline-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Candidate</th>
+                <th>Role</th>
+                <th>Score</th>
+                <th>Status</th>
+                <th>Next step</th>
+              </tr>
+            </thead>
+            <tbody id="pipelineBody">
+              <tr class="empty-row">
+                <td colspan="5">Awaiting converted profiles</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=20260506-default-style"></script>
+    <script src="./app.js?v=20260506-workflows"></script>
   </body>
 </html>

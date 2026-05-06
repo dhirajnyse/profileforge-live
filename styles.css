@@ -52,6 +52,26 @@ svg {
   backdrop-filter: blur(10px);
 }
 
+.app-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 32px 0;
+}
+
+.app-tabs a {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--blue);
+  background: rgba(255, 255, 255, 0.78);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .brand {
   display: flex;
   align-items: center;
@@ -112,6 +132,13 @@ svg {
   padding: 24px 32px 32px;
 }
 
+.automation-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  padding: 0 32px 32px;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -120,7 +147,9 @@ svg {
 }
 
 .setup-panel,
-.results-panel {
+.results-panel,
+.automation-panel,
+.pipeline-panel {
   padding: 20px;
 }
 
@@ -198,7 +227,8 @@ svg {
 }
 
 button,
-.download-all {
+.download-all,
+.recipe-card {
   min-height: 38px;
   display: inline-flex;
   align-items: center;
@@ -231,8 +261,192 @@ button,
   padding: 0 14px;
 }
 
+.secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .secondary:hover {
   border-color: var(--blue-2);
+}
+
+.compact-primary {
+  margin-top: 0;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.metric-card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.metric-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.metric-card strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 26px;
+  letter-spacing: 0;
+}
+
+.workflow-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 430px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.workflow-compose {
+  display: grid;
+  gap: 12px;
+}
+
+.field-stack {
+  display: grid;
+  gap: 6px;
+}
+
+.field-stack label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.field-stack select,
+.field-stack textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #ffffff;
+  font: inherit;
+}
+
+.field-stack select {
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.field-stack textarea {
+  resize: vertical;
+  min-height: 110px;
+  padding: 10px;
+  line-height: 1.45;
+}
+
+.recipe-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.recipe-card {
+  min-height: 76px;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--ink);
+  text-align: left;
+}
+
+.recipe-card:hover {
+  border-color: var(--blue-2);
+}
+
+.recipe-card span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.task-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.task-card {
+  min-height: 132px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.task-card strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.task-card p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.task-meta span,
+.score-pill {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--blue);
+  background: #e9f1f8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.empty-state {
+  grid-column: 1 / -1;
+  padding: 28px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.pipeline-wrap table {
+  min-width: 880px;
+}
+
+.pipeline-status {
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 8px;
+  background: #ffffff;
+}
+
+.next-step {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .selected-list {
@@ -447,5 +661,21 @@ tr:last-child td {
   .workspace {
     grid-template-columns: 1fr;
     padding: 20px;
+  }
+
+  .app-tabs,
+  .automation-shell {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .workflow-grid,
+  .metric-grid,
+  .task-board {
+    grid-template-columns: 1fr;
+  }
+
+  .recipe-strip {
+    grid-template-columns: 1fr;
   }
 }

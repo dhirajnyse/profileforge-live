@@ -25,6 +25,7 @@
       <a href="#converter">Converter</a>
       <a href="#automationHub">Workflows</a>
       <a href="#pipelinePanel">Pipeline</a>
+      <a href="#screeningPanel">Screening</a>
     </nav>
 
     <main class="workspace" id="converter">
@@ -221,9 +222,72 @@
           </table>
         </div>
       </div>
+
+      <div class="panel screening-panel" id="screeningPanel">
+        <div class="panel-heading">
+          <h2>Screening Lab</h2>
+          <div class="output-actions">
+            <button type="button" class="secondary" id="copyMatches">
+              <svg viewBox="0 0 24 24"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path></svg>
+              Copy
+            </button>
+            <button type="button" class="secondary" id="exportMatches">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg>
+              Export
+            </button>
+          </div>
+        </div>
+
+        <div class="screening-grid">
+          <section class="workflow-compose">
+            <div class="field-stack">
+              <label for="roleRequirement">Role requirement</label>
+              <textarea id="roleRequirement" rows="7">Paste role requirements here, for example: Python, machine learning, SQL, dashboards, client communication, 5+ years experience.</textarea>
+            </div>
+            <div class="button-row left-buttons">
+              <button type="button" class="primary compact-primary" id="runMatcher">
+                <svg viewBox="0 0 24 24"><path d="M20 7h-9"></path><path d="M14 17H5"></path><circle cx="17" cy="17" r="3"></circle><circle cx="7" cy="7" r="3"></circle></svg>
+                Match role
+              </button>
+              <button type="button" class="secondary" id="compareCandidates">
+                <svg viewBox="0 0 24 24"><path d="M4 6h16"></path><path d="M4 12h16"></path><path d="M4 18h16"></path></svg>
+                Compare
+              </button>
+            </div>
+          </section>
+
+          <section class="candidate-picker" id="candidatePicker">
+            <div class="empty-state">Convert CVs to choose candidates</div>
+          </section>
+        </div>
+
+        <div class="match-summary" id="matchSummary">
+          <div class="empty-state">Run a role match to see ranked candidates</div>
+        </div>
+
+        <div class="table-wrap comparison-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Candidate</th>
+                <th>Role</th>
+                <th>Years</th>
+                <th>Fit</th>
+                <th>Matched keywords</th>
+                <th>Missing data</th>
+              </tr>
+            </thead>
+            <tbody id="comparisonBody">
+              <tr class="empty-row">
+                <td colspan="6">Select candidates and click Compare</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=20260506-workflows"></script>
+    <script src="./app.js?v=20260506-screening"></script>
   </body>
 </html>

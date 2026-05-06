@@ -3,6 +3,7 @@ const state = {
   objectUrls: [],
   pipeline: [],
   taskPlan: [],
+  matchResults: [],
 };
 
 const els = {
@@ -33,6 +34,14 @@ const els = {
   exportPipeline: document.querySelector("#exportPipeline"),
   copyBrief: document.querySelector("#copyBrief"),
   clearPipeline: document.querySelector("#clearPipeline"),
+  roleRequirement: document.querySelector("#roleRequirement"),
+  runMatcher: document.querySelector("#runMatcher"),
+  compareCandidates: document.querySelector("#compareCandidates"),
+  candidatePicker: document.querySelector("#candidatePicker"),
+  matchSummary: document.querySelector("#matchSummary"),
+  comparisonBody: document.querySelector("#comparisonBody"),
+  copyMatches: document.querySelector("#copyMatches"),
+  exportMatches: document.querySelector("#exportMatches"),
   toast: document.querySelector("#toast"),
 };
 
@@ -184,6 +193,11 @@ function makePipelineItem(record) {
     roleTitle: profile.roleTitle || "",
     yearsOfExperience: profile.yearsOfExperience || "",
     keySkills: profile.keySkills || "",
+    relevantExperience: profile.relevantExperience || "",
+    certifications: profile.certifications || "",
+    educationalQualifications: profile.educationalQualifications || "",
+    previousEmployer: profile.previousEmployer || "",
+    projectsHandled: profile.projectsHandled || "",
     score,
     status: score >= 78 ? "Shortlist" : "Review",
     nextStep: score >= 78 ? "Prepare client submission pack" : "Verify CV details and role match",
@@ -264,6 +278,11 @@ function renderPipeline() {
   if (els.exportPipeline) els.exportPipeline.disabled = !state.pipeline.length;
   if (els.copyBrief) els.copyBrief.disabled = !state.pipeline.length;
   if (els.clearPipeline) els.clearPipeline.disabled = !state.pipeline.length;
+  if (els.runMatcher) els.runMatcher.disabled = !state.pipeline.length;
+  if (els.compareCandidates) els.compareCandidates.disabled = !state.pipeline.length;
+  if (els.copyMatches) els.copyMatches.disabled = !state.pipeline.length;
+  if (els.exportMatches) els.exportMatches.disabled = !state.pipeline.length;
+  renderCandidatePicker();
 }
 
 function updatePipelineStatus(id, status) {
@@ -281,6 +300,246 @@ function updatePipelineStatus(id, status) {
     }[status] || item.nextStep;
   savePipeline();
   renderPipeline();
+}
+
+function pipelineText(item) {
+  return [
+    item.candidateName,
+    item.roleCode,
+    item.roleTitle,
+    item.yearsOfExperience,
+    item.keySkills,
+    item.relevantExperience,
+    item.certifications,
+    item.educationalQualifications,
+    item.previousEmployer,
+    item.projectsHandled,
+  ].join(" ");
+}
+
+const keywordStopwords = new Set([
+  "and",
+  "the",
+  "for",
+  "with",
+  "from",
+  "this",
+  "that",
+  "role",
+  "candidate",
+  "experience",
+  "years",
+  "year",
+  "plus",
+  "must",
+  "have",
+  "good",
+  "strong",
+  "able",
+  "will",
+  "work",
+  "team",
+  "using",
+  "knowledge",
+  "skills",
+  "skill",
+  "required",
+  "requirements",
+  "preferred",
+  "responsible",
+  "responsibilities",
+]);
+
+const shortSkillKeywords = new Set(["ai", "ml", "bi", "ui", "ux", "qa", "sql", "api", "aws", "etl", "nlp", "llm", "crm", "erp"]);
+
+function extractKeywords(value) {
+  const normalized = String(value || "")
+    .toLowerCase()
+    .replace(/c\+\+/g, "cplusplus")
+    .replace(/c#/g, "csharp")
+    .replace(/\.net/g, "dotnet")
+    .replace(/[^a-z0-9]+/g, " ");
+  const words = normalized.split(/\s+/).filter(Boolean);
+  const output = [];
+  const seen = new Set();
+  for (const word of words) {
+    if (keywordStopwords.has(word)) continue;
+    if (word.length < 3 && !shortSkillKeywords.has(word)) continue;
+    if (seen.has(word)) continue;
+    seen.add(word);
+    output.push(word);
+  }
+  return output.slice(0, 42);
+}
+
+function missingDataFields(item) {
+  const checks = [
+    ["Certifications", item.certifications],
+    ["Education", item.educationalQualifications],
+    ["Employer", item.previousEmployer],
+    ["Projects", item.projectsHandled],
+    ["Relevant experience", item.relevantExperience],
+    ["Key skills", item.keySkills],
+  ];
+  return checks
+    .filter(([, value]) => {
+      const text = String(value || "").trim();
+      return !text || /not specified|extracted from cv/i.test(text);
+    })
+    .map(([label]) => label);
+}
+
+function roleMatchResults(requirement) {
+  const requirementKeywords = extractKeywords(requirement);
+  if (!requirementKeywords.length) return [];
+
+  return state.pipeline
+    .map((item) => {
+      const candidateText = ` ${pipelineText(item).toLowerCase()} `;
+      const matched = requirementKeywords.filter((keyword) => candidateText.includes(keyword));
+      const missing = requirementKeywords.filter((keyword) => !matched.includes(keyword));
+      const keywordFit = Math.round((matched.length / requirementKeywords.length) * 100);
+      const fit = Math.min(99, Math.round(keywordFit * 0.72 + (Number(item.score) || 0) * 0.28));
+      return {
+        ...item,
+        fit,
+        matched,
+        missingKeywords: missing,
+        missingData: missingDataFields(item),
+      };
+    })
+    .sort((a, b) => b.fit - a.fit || b.score - a.score);
+}
+
+function renderCandidatePicker() {
+  if (!els.candidatePicker) return;
+  if (!state.pipeline.length) {
+    els.candidatePicker.innerHTML = '<div class="empty-state">Convert CVs to choose candidates</div>';
+    return;
+  }
+
+  els.candidatePicker.innerHTML = state.pipeline
+    .slice()
+    .sort((a, b) => b.score - a.score)
+    .map(
+      (item) => `
+        <label class="candidate-option">
+          <input type="checkbox" value="${escapeHtml(item.id)}" />
+          <span>
+            <strong>${escapeHtml(item.candidateName)}</strong>
+            <span>${escapeHtml([item.roleCode, item.roleTitle].filter(Boolean).join(" - ") || "Role not listed")}</span>
+          </span>
+        </label>
+      `,
+    )
+    .join("");
+}
+
+function selectedCandidateIds() {
+  return Array.from(els.candidatePicker?.querySelectorAll("input:checked") || []).map((input) => input.value);
+}
+
+function selectedCandidates() {
+  const ids = selectedCandidateIds();
+  if (!ids.length) return state.pipeline.slice().sort((a, b) => b.score - a.score).slice(0, 5);
+  return state.pipeline.filter((item) => ids.includes(item.id));
+}
+
+function renderMatchSummary() {
+  if (!els.matchSummary) return;
+  if (!state.matchResults.length) {
+    els.matchSummary.innerHTML = '<div class="empty-state">Run a role match to see ranked candidates</div>';
+    return;
+  }
+
+  els.matchSummary.innerHTML = state.matchResults
+    .slice(0, 5)
+    .map(
+      (item) => `
+        <article class="match-card">
+          <div>
+            <strong>${escapeHtml(item.candidateName)}</strong>
+            <p>${escapeHtml([item.roleCode, item.roleTitle].filter(Boolean).join(" - ") || "Role not listed")}</p>
+            <div class="keyword-list">
+              ${(item.matched.slice(0, 8).length ? item.matched.slice(0, 8) : ["no keyword hits"]).map((keyword) => `<span>${escapeHtml(keyword)}</span>`).join("")}
+            </div>
+          </div>
+          <div class="fit-meter">
+            <strong>${item.fit}%</strong>
+            <span>fit</span>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function runMatcher() {
+  if (!state.pipeline.length) {
+    showToast("Convert CVs first");
+    return;
+  }
+  const requirement = els.roleRequirement?.value || "";
+  state.matchResults = roleMatchResults(requirement);
+  if (!state.matchResults.length) {
+    showToast("Add clearer role requirements");
+    return;
+  }
+  renderMatchSummary();
+  renderComparison(state.matchResults.slice(0, 5));
+  if (els.copyMatches) els.copyMatches.disabled = false;
+  if (els.exportMatches) els.exportMatches.disabled = false;
+  showToast("Role match complete");
+}
+
+function comparisonRows(candidates) {
+  const matchById = new Map(state.matchResults.map((item) => [item.id, item]));
+  return candidates.map((item) => matchById.get(item.id) || { ...item, fit: item.score || 0, matched: extractKeywords(item.keySkills || "").slice(0, 8), missingData: missingDataFields(item) });
+}
+
+function renderComparison(candidates = selectedCandidates()) {
+  if (!els.comparisonBody) return;
+  const rows = comparisonRows(candidates);
+  if (!rows.length) {
+    els.comparisonBody.innerHTML = '<tr class="empty-row"><td colspan="6">Select candidates and click Compare</td></tr>';
+    return;
+  }
+  els.comparisonBody.innerHTML = rows
+    .map(
+      (item) => `
+        <tr>
+          <td><strong>${escapeHtml(item.candidateName)}</strong><div class="next-step">${escapeHtml(item.status || "Review")}</div></td>
+          <td>${escapeHtml([item.roleCode, item.roleTitle].filter(Boolean).join(" - "))}</td>
+          <td>${escapeHtml(item.yearsOfExperience || "Not listed")}</td>
+          <td><span class="score-pill">${escapeHtml(item.fit || item.score || 0)}%</span></td>
+          <td><div class="keyword-list">${(item.matched || []).slice(0, 10).map((keyword) => `<span>${escapeHtml(keyword)}</span>`).join("") || "<span>review</span>"}</div></td>
+          <td>${escapeHtml((item.missingData || missingDataFields(item)).join(", ") || "None flagged")}</td>
+        </tr>
+      `,
+    )
+    .join("");
+}
+
+function matchReportText() {
+  const rows = state.matchResults.length ? state.matchResults : comparisonRows(selectedCandidates());
+  if (!rows.length) return "No screening results yet.";
+  return [
+    "ProfileForge Role Match",
+    `Requirement: ${els.roleRequirement?.value || ""}`,
+    "",
+    ...rows.map(
+      (item, index) =>
+        `${index + 1}. ${item.candidateName} - ${item.roleCode || item.roleTitle || "Role"} - fit ${item.fit || item.score || 0}% - matched: ${(item.matched || []).slice(0, 10).join(", ") || "review"} - missing data: ${(item.missingData || missingDataFields(item)).join(", ") || "none"}`,
+    ),
+  ].join("\n");
+}
+
+function matchReportCsv() {
+  const rows = state.matchResults.length ? state.matchResults : comparisonRows(selectedCandidates());
+  const headers = ["Candidate", "Role Code", "Role Title", "Years", "Fit", "Status", "Matched Keywords", "Missing Data", "Source"];
+  return [headers, ...rows.map((item) => [item.candidateName, item.roleCode, item.roleTitle, item.yearsOfExperience, item.fit || item.score || 0, item.status, (item.matched || []).join("; "), (item.missingData || missingDataFields(item)).join("; "), item.sourceName])]
+    .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+    .join("\n");
 }
 
 function pipelineCsv() {
@@ -1060,10 +1319,26 @@ els.copyBrief?.addEventListener("click", async () => {
   await copyText(dailyBrief());
   showToast("Brief copied");
 });
+els.runMatcher?.addEventListener("click", runMatcher);
+els.compareCandidates?.addEventListener("click", () => {
+  if (!state.pipeline.length) return;
+  renderComparison();
+  showToast("Comparison ready");
+});
+els.copyMatches?.addEventListener("click", async () => {
+  await copyText(matchReportText());
+  showToast("Screening report copied");
+});
+els.exportMatches?.addEventListener("click", () => {
+  downloadTextFile("profileforge-role-match.csv", matchReportCsv(), "text/csv");
+});
 els.clearPipeline?.addEventListener("click", () => {
   state.pipeline = [];
+  state.matchResults = [];
   savePipeline();
   renderPipeline();
+  renderMatchSummary();
+  renderComparison([]);
   showToast("Pipeline cleared");
 });
 els.pipelineBody?.addEventListener("change", (event) => {

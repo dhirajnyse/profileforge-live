@@ -431,7 +431,8 @@ button,
   text-align: center;
 }
 
-.pipeline-wrap table {
+.pipeline-wrap table,
+.comparison-wrap table {
   min-width: 880px;
 }
 
@@ -447,6 +448,117 @@ button,
   color: var(--muted);
   font-size: 13px;
   line-height: 1.35;
+}
+
+.screening-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 430px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.left-buttons {
+  justify-content: flex-start;
+}
+
+.left-buttons .primary {
+  width: auto;
+  min-width: 150px;
+  padding: 0 14px;
+}
+
+.candidate-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.candidate-option {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.candidate-option input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--blue);
+}
+
+.candidate-option strong,
+.candidate-option span {
+  display: block;
+}
+
+.candidate-option span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.match-summary {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.match-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.match-card strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.match-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.fit-meter {
+  width: 112px;
+  text-align: right;
+}
+
+.fit-meter strong {
+  font-size: 24px;
+  color: var(--green);
+}
+
+.keyword-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.keyword-list span {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: var(--blue);
+  background: #e9f1f8;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .selected-list {
@@ -671,7 +783,9 @@ tr:last-child td {
 
   .workflow-grid,
   .metric-grid,
-  .task-board {
+  .task-board,
+  .screening-grid,
+  .candidate-picker {
     grid-template-columns: 1fr;
   }
 

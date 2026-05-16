@@ -98,9 +98,29 @@
           <input id="singleSheetWorkbook" type="checkbox" />
           <span>
             <strong>Put combined profiles on one sheet</strong>
-            <small>Profiles are stacked in the same order as uploaded PDFs</small>
+            <small>Profiles are arranged in the same order as uploaded PDFs</small>
           </span>
         </label>
+
+        <div class="stacking-options" id="stackingOptions" hidden>
+          <strong>Single-sheet layout</strong>
+          <div class="stacking-choice">
+            <label>
+              <input type="radio" name="stackDirection" value="vertical" checked />
+              <span>
+                <b>Vertical stacking</b>
+                <small>One profile below another</small>
+              </span>
+            </label>
+            <label>
+              <input type="radio" name="stackDirection" value="horizontal" />
+              <span>
+                <b>Horizontal stacking</b>
+                <small>One profile beside another</small>
+              </span>
+            </label>
+          </div>
+        </div>
 
         <label class="option-row">
           <input id="reviewBeforeExcel" type="checkbox" checked />
@@ -350,6 +370,6 @@
     </section>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=20260516-single-sheet"></script>
+    <script src="./app.js?v=20260516-stacking-layouts"></script>
   </body>
 </html>

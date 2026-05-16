@@ -45,6 +45,8 @@ const els = {
   resetMapping: document.querySelector("#resetMapping"),
   combinedWorkbook: document.querySelector("#combinedWorkbook"),
   singleSheetWorkbook: document.querySelector("#singleSheetWorkbook"),
+  stackingOptions: document.querySelector("#stackingOptions"),
+  stackDirectionOptions: Array.from(document.querySelectorAll?.('input[name="stackDirection"]') || []),
   reviewBeforeExcel: document.querySelector("#reviewBeforeExcel"),
   chooseFiles: document.querySelector("#chooseFiles"),
   chooseFolder: document.querySelector("#chooseFolder"),
@@ -886,6 +888,15 @@ function syncCombinedOptions(source = "") {
   const singleSheetAllowed = els.combinedWorkbook.checked;
   els.singleSheetWorkbook.disabled = !singleSheetAllowed;
   els.singleSheetWorkbook.closest?.(".option-row")?.classList.toggle("option-disabled", !singleSheetAllowed);
+  const singleSheetActive = singleSheetAllowed && els.singleSheetWorkbook.checked;
+  els.stackingOptions.hidden = !singleSheetActive;
+  els.stackDirectionOptions.forEach((option) => {
+    option.disabled = !singleSheetActive;
+  });
+}
+
+function selectedStackDirection() {
+  return els.stackDirectionOptions.find((option) => option.checked)?.value || "vertical";
 }
 
 function normalizeLine(line) {
@@ -1223,19 +1234,27 @@ function cellXml(row, col, value, style) {
   return `<c r="${ref}" s="${style}" t="inlineStr"><is><t>${xmlEscape(value)}</t></is></c>`;
 }
 
-function rowXml(rowNumber, values, height, styleRowNumber = rowNumber) {
-  const cells = values
+function profileCellStyle(styleRowNumber, localCol) {
+  let style = 2;
+  if (styleRowNumber === 1) style = 1;
+  else if (localCol === 1) style = 3;
+  else if (localCol === 2 && styleRowNumber !== 13) style = 4;
+  else if (styleRowNumber === 13 && localCol === 2) style = 5;
+  else if (styleRowNumber === 13 && localCol === 3) style = 6;
+  return style;
+}
+
+function rowCellsXml(rowNumber, values, styleRowNumber = rowNumber, colOffset = 0) {
+  return values
     .map((value, index) => {
-      const col = index + 1;
-      let style = 2;
-      if (styleRowNumber === 1) style = 1;
-      else if (col === 1) style = 3;
-      else if (col === 2 && styleRowNumber !== 13) style = 4;
-      else if (styleRowNumber === 13 && col === 2) style = 5;
-      else if (styleRowNumber === 13 && col === 3) style = 6;
-      return cellXml(rowNumber, col, value, style);
+      const localCol = index + 1;
+      return cellXml(rowNumber, colOffset + localCol, value, profileCellStyle(styleRowNumber, localCol));
     })
     .join("");
+}
+
+function rowXml(rowNumber, values, height, styleRowNumber = rowNumber, colOffset = 0) {
+  const cells = rowCellsXml(rowNumber, values, styleRowNumber, colOffset);
   return `<row r="${rowNumber}" ht="${height}" customHeight="1">${cells}</row>`;
 }
 
@@ -1278,7 +1297,57 @@ function stackedSheetData(records) {
   return { rows: rows.join(""), totalRows: Math.max(1, rowNumber - 1) };
 }
 
-function stackedSheetXml(records) {
+function horizontalStackedSheetData(records) {
+  const profileTables = records.map((record) => profileTable(record.profile));
+  const rows = PROFILE_ROW_HEIGHTS.map((height, index) => {
+    const rowNumber = index + 1;
+    const cells = profileTables
+      .map((table, recordIndex) => rowCellsXml(rowNumber, table[index], rowNumber, recordIndex * 4))
+      .join("");
+    return `<row r="${rowNumber}" ht="${height}" customHeight="1">${cells}</row>`;
+  }).join("");
+  return {
+    rows,
+    totalRows: 13,
+    totalColumns: Math.max(3, records.length * 4 - 1),
+  };
+}
+
+function stackedColsXml(totalColumns = 3) {
+  const cols = [];
+  for (let col = 1; col <= totalColumns; col += 1) {
+    const position = (col - 1) % 4;
+    if (position === 0) cols.push(`<col min="${col}" max="${col}" width="5.25" customWidth="1"/>`);
+    else if (position === 1) cols.push(`<col min="${col}" max="${col}" width="24.23" customWidth="1"/>`);
+    else if (position === 2) cols.push(`<col min="${col}" max="${col}" width="96.23" customWidth="1"/>`);
+    else cols.push(`<col min="${col}" max="${col}" width="2.5" customWidth="1"/>`);
+  }
+  return `<cols>${cols.join("")}</cols>`;
+}
+
+function stackedSheetXml(records, direction = "vertical") {
+  const horizontal = direction === "horizontal";
+  const { rows, totalRows, totalColumns = 3 } = horizontal ? horizontalStackedSheetData(records) : stackedSheetData(records);
+  const lastCell = `${columnName(totalColumns)}${totalRows}`;
+  const pageSetup = horizontal
+    ? '<pageSetup paperSize="9" orientation="portrait" fitToWidth="0" fitToHeight="1" horizontalDpi="300" verticalDpi="300"/>'
+    : '<pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0" horizontalDpi="300" verticalDpi="300"/>';
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>
+  <dimension ref="A1:${lastCell}"/>
+  <sheetViews><sheetView workbookViewId="0" showGridLines="0" defaultGridColor="0" colorId="1"/></sheetViews>
+  <sheetFormatPr defaultRowHeight="15"/>
+  ${horizontal ? stackedColsXml(totalColumns) : stackedColsXml(3)}
+  <sheetData>${rows}</sheetData>
+  <printOptions horizontalCentered="1" gridLines="0"/>
+  <pageMargins left="0.25" right="0.25" top="0.35" bottom="0.35" header="0.1" footer="0.1"/>
+  ${pageSetup}
+  <headerFooter><oddFooter>&amp;L&amp;F&amp;C&amp;A&amp;R&amp;P/&amp;N</oddFooter></headerFooter>
+</worksheet>`;
+}
+
+function verticalStackedSheetXml(records) {
   const { rows, totalRows } = stackedSheetData(records);
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
@@ -1457,15 +1526,15 @@ async function createWorkbookBlob(records) {
   return bytes;
 }
 
-async function createStackedWorkbookBlob(records) {
+async function createStackedWorkbookBlob(records, direction = "vertical") {
   const zip = new JSZip();
   const props = docPropsXml();
-  const { totalRows } = stackedSheetData(records);
+  const { totalRows, totalColumns = 3 } = direction === "horizontal" ? horizontalStackedSheetData(records) : stackedSheetData(records);
   const sheetName = "All Profiles";
   const sheets = [
     {
       name: sheetName,
-      printArea: `'${sheetName}'!$A$1:$C$${totalRows}`,
+      printArea: `'${sheetName}'!$A$1:$${columnName(totalColumns)}$${totalRows}`,
     },
   ];
 
@@ -1476,7 +1545,7 @@ async function createStackedWorkbookBlob(records) {
   zip.file("xl/workbook.xml", workbookXml(sheets));
   zip.file("xl/_rels/workbook.xml.rels", workbookRelsXml(1));
   zip.file("xl/styles.xml", stylesXml());
-  zip.file("xl/worksheets/sheet1.xml", stackedSheetXml(records));
+  zip.file("xl/worksheets/sheet1.xml", stackedSheetXml(records, direction));
 
   return zip.generateAsync({
     type: "blob",
@@ -2041,7 +2110,7 @@ async function createProfileWorkbookBlob(records, templateSource = null) {
 
 async function createCombinedWorkbookBlob(records, templateSource = null) {
   if (els.singleSheetWorkbook.checked) {
-    return createStackedWorkbookBlob(records);
+    return createStackedWorkbookBlob(records, selectedStackDirection());
   }
   return createProfileWorkbookBlob(records, templateSource);
 }

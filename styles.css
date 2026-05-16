@@ -773,6 +773,53 @@ button,
   opacity: 0.62;
 }
 
+.stacking-options {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.stacking-options > strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.stacking-choice {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stacking-choice label {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  cursor: pointer;
+}
+
+.stacking-choice input {
+  margin-top: 2px;
+  accent-color: var(--blue);
+}
+
+.stacking-choice b,
+.stacking-choice small {
+  display: block;
+}
+
+.stacking-choice small {
+  margin-top: 3px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 .option-row strong,
 .option-row small {
   display: block;
@@ -1093,6 +1140,10 @@ tr:last-child td {
   .selected-actions {
     grid-column: 2;
     justify-content: flex-start;
+  }
+
+  .stacking-choice {
+    grid-template-columns: 1fr;
   }
 
   .template-actions {

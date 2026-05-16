@@ -95,6 +95,7 @@ const state = {
   matchResults: [],
   batchReceipt: null,
   galaxyFocusId: null,
+  theaterSlide: 0,
 };
 
 const els = {
@@ -179,6 +180,25 @@ const els = {
   copyPortal: document.querySelector("#copyPortal"),
   downloadPortal: document.querySelector("#downloadPortal"),
   portalDemo: document.querySelector("#portalDemo"),
+  submissionContent: document.querySelector("#submissionContent"),
+  submissionClientContact: document.querySelector("#submissionClientContact"),
+  submissionSenderName: document.querySelector("#submissionSenderName"),
+  submissionTone: document.querySelector("#submissionTone"),
+  copySubmissionEmail: document.querySelector("#copySubmissionEmail"),
+  copySubmissionWhatsApp: document.querySelector("#copySubmissionWhatsApp"),
+  downloadSubmissionPack: document.querySelector("#downloadSubmissionPack"),
+  submissionDemo: document.querySelector("#submissionDemo"),
+  theaterContent: document.querySelector("#theaterContent"),
+  copyTheaterScript: document.querySelector("#copyTheaterScript"),
+  downloadTheaterDeck: document.querySelector("#downloadTheaterDeck"),
+  startTheater: document.querySelector("#startTheater"),
+  theaterDemo: document.querySelector("#theaterDemo"),
+  theaterModal: document.querySelector("#theaterModal"),
+  theaterModalSlide: document.querySelector("#theaterModalSlide"),
+  theaterModalCounter: document.querySelector("#theaterModalCounter"),
+  theaterModalPrev: document.querySelector("#theaterModalPrev"),
+  theaterModalNext: document.querySelector("#theaterModalNext"),
+  closeTheater: document.querySelector("#closeTheater"),
   loadDemo: document.querySelector("#loadDemo"),
   copyAssistantGuide: document.querySelector("#copyAssistantGuide"),
   copyPricing: document.querySelector("#copyPricing"),
@@ -894,6 +914,463 @@ function renderPortal() {
   `;
 }
 
+function submissionMeta() {
+  const portal = portalMeta();
+  return {
+    ...portal,
+    contact: String(els.submissionClientContact?.value || "Client Hiring Team").trim() || "Client Hiring Team",
+    sender: String(els.submissionSenderName?.value || "ProfileForge Team").trim() || "ProfileForge Team",
+    tone: String(els.submissionTone?.value || "polished"),
+  };
+}
+
+function submissionCandidates() {
+  return portalCandidates();
+}
+
+function submissionStats() {
+  const candidates = submissionCandidates();
+  const stats = portalStats();
+  const top = candidates[0];
+  return {
+    ...stats,
+    leadName: top?.candidateName || "Lead candidate",
+    leadScore: top?.score || 0,
+    leadRole: top ? [top.roleCode, top.roleTitle].filter(Boolean).join(" - ") : "",
+  };
+}
+
+function submissionSubject() {
+  const meta = submissionMeta();
+  const stats = submissionStats();
+  return `${meta.roleLabel}: ${stats.ready || stats.total} shortlisted profile${(stats.ready || stats.total) === 1 ? "" : "s"} ready for review`;
+}
+
+function submissionOpening() {
+  const tone = submissionMeta().tone;
+  if (tone === "urgent") return "Sharing the priority shortlist for quick review.";
+  if (tone === "warm") return "I hope you are doing well. I am pleased to share the shortlisted profiles for your review.";
+  return "Please find below the recommended shortlist for your review.";
+}
+
+function submissionEmailText() {
+  const candidates = submissionCandidates();
+  if (!candidates.length) return "No submission email is available yet. Load demo or convert CVs first.";
+  const meta = submissionMeta();
+  const stats = submissionStats();
+  const top = candidates.slice(0, 6);
+  return [
+    `Subject: ${submissionSubject()}`,
+    "",
+    `Dear ${meta.contact},`,
+    "",
+    submissionOpening(),
+    "",
+    `Campaign: ${meta.roleLabel}`,
+    `Profiles included: ${stats.total}`,
+    `Submission-ready profiles: ${stats.ready}`,
+    `Lead recommendation: ${stats.leadName} (${stats.leadScore} score)`,
+    `Strongest skill signal: ${stats.strongestSkill}`,
+    "",
+    "Recommended shortlist:",
+    ...top.map((item, index) => {
+      const role = [item.roleCode, item.roleTitle].filter(Boolean).join(" - ") || "Role pending";
+      return `${index + 1}. ${item.candidateName} - ${role} - ${item.yearsOfExperience || "Experience pending"} - score ${item.score}`;
+    }),
+    "",
+    "I have also prepared the profile workbook, client portal, and presentation view so the shortlist can be reviewed quickly.",
+    "",
+    "Recommended next step: confirm the preferred profiles and I will proceed with final availability/details validation.",
+    "",
+    `Regards,`,
+    meta.sender,
+  ].join("\n");
+}
+
+function submissionWhatsAppText() {
+  const candidates = submissionCandidates();
+  if (!candidates.length) return "No WhatsApp summary is available yet. Load demo or convert CVs first.";
+  const meta = submissionMeta();
+  const stats = submissionStats();
+  const top = candidates.slice(0, 4);
+  return [
+    `Hi ${meta.contact}, sharing the ${meta.roleLabel} shortlist.`,
+    `${stats.total} profiles reviewed, ${stats.ready} submission-ready, lead candidate: ${stats.leadName} (${stats.leadScore}).`,
+    "",
+    ...top.map((item, index) => `${index + 1}. ${item.candidateName} - ${item.yearsOfExperience || "Exp pending"} - score ${item.score}`),
+    "",
+    "I can send the Excel profile workbook, client portal, and presentation view for review.",
+  ].join("\n");
+}
+
+function submissionPackHtml() {
+  const meta = submissionMeta();
+  const stats = submissionStats();
+  const candidates = submissionCandidates();
+  const rows = candidates
+    .slice(0, 12)
+    .map(
+      (item, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td><strong>${escapeHtml(item.candidateName)}</strong></td>
+          <td>${escapeHtml([item.roleCode, item.roleTitle].filter(Boolean).join(" - ") || "Role pending")}</td>
+          <td>${escapeHtml(item.yearsOfExperience || "Experience pending")}</td>
+          <td>${escapeHtml(item.status || "Review")}</td>
+          <td>${escapeHtml(item.score || 0)}</td>
+        </tr>
+      `,
+    )
+    .join("");
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(meta.roleLabel)} - Submission Pack</title>
+<style>
+body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f4f7fb;color:#17202a}.wrap{max-width:1120px;margin:auto;padding:30px}.hero{border:1px solid #d6e1ec;border-radius:16px;padding:28px;background:linear-gradient(135deg,#fff,#edf6ff 45%,#edfff7);box-shadow:0 22px 60px rgba(23,32,42,.1)}.kicker{font-size:12px;font-weight:900;color:#214f8f;text-transform:uppercase}h1{margin:8px 0;font-size:36px}.muted{color:#5c6876}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}.stat{padding:14px;border:1px solid #d6e1ec;border-radius:12px;background:#fff}.stat span{display:block;color:#5c6876;font-size:12px;font-weight:900;text-transform:uppercase}.stat b{display:block;margin-top:6px;font-size:30px}section{margin-top:18px}pre{white-space:pre-wrap;border:1px solid #d6e1ec;border-radius:12px;background:#fff;padding:16px;line-height:1.45}table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #d6e1ec;border-radius:12px;overflow:hidden}th,td{padding:11px;border-bottom:1px solid #e3e9f0;text-align:left}th{background:#214f8f;color:#fff}tr:last-child td{border-bottom:0}@media(max-width:760px){.stats{grid-template-columns:1fr}table{font-size:13px}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="hero">
+    <span class="kicker">ProfileForge Submission Pack</span>
+    <h1>${escapeHtml(meta.roleLabel)}</h1>
+    <p class="muted">Prepared for ${escapeHtml(meta.contact)} by ${escapeHtml(meta.sender)}.</p>
+  </div>
+  <div class="stats">
+    <div class="stat"><span>Profiles</span><b>${stats.total}</b></div>
+    <div class="stat"><span>Ready</span><b>${stats.ready}</b></div>
+    <div class="stat"><span>Average</span><b>${stats.average}</b></div>
+    <div class="stat"><span>Lead score</span><b>${stats.leadScore}</b></div>
+  </div>
+  <section><h2>Client Email</h2><pre>${escapeHtml(submissionEmailText())}</pre></section>
+  <section><h2>WhatsApp Summary</h2><pre>${escapeHtml(submissionWhatsAppText())}</pre></section>
+  <section><h2>Shortlist Table</h2><table><thead><tr><th>#</th><th>Candidate</th><th>Role</th><th>Years</th><th>Status</th><th>Score</th></tr></thead><tbody>${rows}</tbody></table></section>
+</main>
+</body>
+</html>`;
+}
+
+function renderSubmission() {
+  if (!els.submissionContent) return;
+  const candidates = submissionCandidates();
+  if (!candidates.length) {
+    els.submissionContent.innerHTML = '<div class="empty-state">Load demo or convert CVs to build a client submission.</div>';
+    if (els.copySubmissionEmail) els.copySubmissionEmail.disabled = true;
+    if (els.copySubmissionWhatsApp) els.copySubmissionWhatsApp.disabled = true;
+    if (els.downloadSubmissionPack) els.downloadSubmissionPack.disabled = true;
+    return;
+  }
+
+  if (els.copySubmissionEmail) els.copySubmissionEmail.disabled = false;
+  if (els.copySubmissionWhatsApp) els.copySubmissionWhatsApp.disabled = false;
+  if (els.downloadSubmissionPack) els.downloadSubmissionPack.disabled = false;
+  const stats = submissionStats();
+  const email = submissionEmailText();
+  const whatsapp = submissionWhatsAppText();
+  els.submissionContent.innerHTML = `
+    <div class="submission-dashboard">
+      <article><span>Subject</span><strong>${escapeHtml(submissionSubject())}</strong></article>
+      <article><span>Lead candidate</span><strong>${escapeHtml(stats.leadName)}</strong><small>${escapeHtml(stats.leadScore)} score</small></article>
+      <article><span>Ready profiles</span><strong>${stats.ready}</strong><small>${stats.total} total</small></article>
+      <article><span>Signal</span><strong>${escapeHtml(stats.strongestSkill)}</strong><small>Top skill</small></article>
+    </div>
+    <div class="submission-layout">
+      <section class="submission-preview">
+        <div class="section-title">
+          <h3>Email Preview</h3>
+          <span>Client-ready</span>
+        </div>
+        <pre>${escapeHtml(email)}</pre>
+      </section>
+      <aside class="submission-side">
+        <div>
+          <div class="section-title">
+            <h3>WhatsApp</h3>
+            <span>Quick send</span>
+          </div>
+          <pre>${escapeHtml(whatsapp)}</pre>
+        </div>
+        <div class="submission-timeline">
+          <h3>Send Rhythm</h3>
+          <ol>
+            <li>Send email with Excel workbook and portal link.</li>
+            <li>Send WhatsApp summary after email delivery.</li>
+            <li>Follow up next business day with top two candidates.</li>
+          </ol>
+        </div>
+      </aside>
+    </div>
+  `;
+}
+
+function theaterCandidates() {
+  return portalCandidates();
+}
+
+function theaterSlides() {
+  const candidates = theaterCandidates();
+  if (!candidates.length) return [];
+  const meta = portalMeta();
+  const stats = portalStats();
+  const skills = boardroomSkillSignals(10);
+  const lead = candidates[0];
+  const slides = [
+    {
+      type: "cover",
+      eyebrow: "ProfileForge Showtime",
+      title: meta.clientName,
+      body: `${meta.roleLabel}. A client-ready shortlist story generated from ${stats.total} profile${stats.total === 1 ? "" : "s"}.`,
+      note: `Open with the outcome: ${stats.ready} submission-ready profiles and ${lead.candidateName} as the lead signal.`,
+    },
+    {
+      type: "metrics",
+      eyebrow: "Batch intelligence",
+      title: "The shortlist shape",
+      body: "Use these numbers to frame the client conversation before opening individual CV profiles.",
+      stats,
+      note: `Mention the average score of ${stats.average}, then explain why the ready orbit matters for speed.`,
+    },
+    ...candidates.slice(0, 4).map((item, index) => ({
+      type: "candidate",
+      eyebrow: `Candidate spotlight ${index + 1}`,
+      title: item.candidateName,
+      body: [item.roleCode, item.roleTitle].filter(Boolean).join(" - ") || "Role pending",
+      candidate: item,
+      note: `${item.candidateName}: lead with ${item.yearsOfExperience || "experience pending"}, score ${item.score}, and next step: ${item.nextStep || "verify CV details"}.`,
+    })),
+    {
+      type: "skills",
+      eyebrow: "Skill proof",
+      title: "Signals across the batch",
+      body: "Show the client the common capability patterns before discussing final selection.",
+      skills,
+      note: `The strongest recurring signal is ${stats.strongestSkill}. Use this slide to confirm client priorities.`,
+    },
+    {
+      type: "actions",
+      eyebrow: "Submission plan",
+      title: "Recommended next move",
+      body: "Approve the lead shortlist, validate final details, and use the Excel workbook plus portal export as the formal submission pack.",
+      note: "Close with a simple decision request: confirm shortlist, availability checks, and submission sequence.",
+    },
+  ];
+  return slides;
+}
+
+function theaterSlideHtml(slide) {
+  if (!slide) return "";
+  if (slide.type === "metrics") {
+    const stats = slide.stats || portalStats();
+    return `
+      <article class="theater-slide theater-slide-metrics">
+        <span class="launch-kicker">${escapeHtml(slide.eyebrow)}</span>
+        <h3>${escapeHtml(slide.title)}</h3>
+        <p>${escapeHtml(slide.body)}</p>
+        <div class="theater-metric-wall">
+          <div><span>Profiles</span><strong>${stats.total}</strong></div>
+          <div><span>Ready</span><strong>${stats.ready}</strong></div>
+          <div><span>Average</span><strong>${stats.average}</strong></div>
+          <div><span>Senior</span><strong>${stats.senior}</strong></div>
+        </div>
+      </article>
+    `;
+  }
+
+  if (slide.type === "candidate") {
+    const item = slide.candidate;
+    return `
+      <article class="theater-slide theater-slide-candidate">
+        <span class="launch-kicker">${escapeHtml(slide.eyebrow)}</span>
+        <div class="theater-candidate-grid">
+          <div>
+            <h3>${escapeHtml(slide.title)}</h3>
+            <p>${escapeHtml(slide.body)}</p>
+            <div class="theater-candidate-pills">
+              <span>${escapeHtml(item.yearsOfExperience || "Experience pending")}</span>
+              <span>${escapeHtml(item.status || "Review")}</span>
+              <span>${escapeHtml(item.dueDate || "Next step")}</span>
+            </div>
+          </div>
+          <div class="theater-score-orb">
+            <strong>${escapeHtml(item.score || 0)}</strong>
+            <span>score</span>
+          </div>
+        </div>
+        <div class="theater-next-step">${escapeHtml(item.nextStep || "Verify CV details and role match")}</div>
+      </article>
+    `;
+  }
+
+  if (slide.type === "skills") {
+    return `
+      <article class="theater-slide theater-slide-skills">
+        <span class="launch-kicker">${escapeHtml(slide.eyebrow)}</span>
+        <h3>${escapeHtml(slide.title)}</h3>
+        <p>${escapeHtml(slide.body)}</p>
+        <div class="theater-skill-cloud">
+          ${(slide.skills || []).map((item) => `<span>${escapeHtml(item.keyword)} <b>${item.count}</b></span>`).join("")}
+        </div>
+      </article>
+    `;
+  }
+
+  if (slide.type === "actions") {
+    return `
+      <article class="theater-slide theater-slide-actions">
+        <span class="launch-kicker">${escapeHtml(slide.eyebrow)}</span>
+        <h3>${escapeHtml(slide.title)}</h3>
+        <p>${escapeHtml(slide.body)}</p>
+        <div class="theater-action-list">
+          <span>Confirm shortlist sequence</span>
+          <span>Validate availability and details</span>
+          <span>Send Excel workbook and portal page</span>
+        </div>
+      </article>
+    `;
+  }
+
+  return `
+    <article class="theater-slide theater-slide-cover">
+      <span class="launch-kicker">${escapeHtml(slide.eyebrow)}</span>
+      <h3 id="theaterModalTitle">${escapeHtml(slide.title)}</h3>
+      <p>${escapeHtml(slide.body)}</p>
+      <div class="theater-cover-badges">
+        <span>Boardroom</span>
+        <span>Galaxy</span>
+        <span>Portal</span>
+        <span>Excel</span>
+      </div>
+    </article>
+  `;
+}
+
+function theaterScriptText() {
+  const slides = theaterSlides();
+  if (!slides.length) return "No Showtime Theater script yet. Load demo or convert CVs first.";
+  return [
+    "ProfileForge Showtime Theater Script",
+    "",
+    ...slides.map((slide, index) => `Slide ${index + 1}: ${slide.title}\n${slide.note || slide.body}`),
+  ].join("\n\n");
+}
+
+function theaterDeckHtml() {
+  const slides = theaterSlides();
+  const meta = portalMeta();
+  const slideHtml = slides.map((slide, index) => `<section class="slide${index === 0 ? " active" : ""}">${theaterSlideHtml(slide)}</section>`).join("");
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(meta.clientName)} - Showtime Theater</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Inter,Segoe UI,Arial,sans-serif;background:radial-gradient(circle at 20% 18%,rgba(0,166,214,.18),transparent 28%),radial-gradient(circle at 82% 78%,rgba(224,68,154,.18),transparent 30%),#08111f;color:#fff}.deck{min-height:100vh;display:grid;place-items:center;padding:28px}.slide{display:none;width:min(1120px,94vw)}.slide.active{display:block}.theater-slide{min-height:620px;display:grid;align-content:center;gap:18px;padding:54px;border:1px solid rgba(255,255,255,.2);border-radius:28px;background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(237,246,255,.92) 46%,rgba(255,240,247,.9));color:#17202a;box-shadow:0 40px 100px rgba(0,0,0,.34)}.launch-kicker{color:#214f8f;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}.theater-slide h3{margin:0;font-size:56px;line-height:1.02}.theater-slide p{max-width:820px;margin:0;color:#5c6876;font-size:21px;line-height:1.45}.theater-metric-wall{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.theater-metric-wall div,.theater-next-step,.theater-action-list span{padding:18px;border:1px solid #d6e1ec;border-radius:18px;background:#fff}.theater-metric-wall span{display:block;color:#5c6876;font-weight:900;text-transform:uppercase}.theater-metric-wall strong{display:block;margin-top:8px;color:#214f8f;font-size:46px}.theater-candidate-grid{display:grid;grid-template-columns:1fr 190px;gap:24px;align-items:center}.theater-score-orb{width:180px;height:180px;display:grid;place-items:center;align-content:center;border-radius:999px;color:#fff;background:linear-gradient(135deg,#214f8f,#e0449a 58%,#24be86);box-shadow:0 24px 50px rgba(33,79,143,.28)}.theater-score-orb strong{font-size:58px}.theater-score-orb span{text-transform:uppercase;font-weight:900}.theater-candidate-pills,.theater-skill-cloud,.theater-cover-badges,.theater-action-list{display:flex;flex-wrap:wrap;gap:10px}.theater-candidate-pills span,.theater-skill-cloud span,.theater-cover-badges span{padding:9px 13px;border-radius:999px;background:#edf6ff;color:#214f8f;font-weight:900}.theater-skill-cloud span{font-size:18px}.controls{position:fixed;left:50%;bottom:24px;display:flex;gap:12px;align-items:center;transform:translateX(-50%)}button{min-height:42px;border:1px solid rgba(255,255,255,.34);border-radius:999px;padding:0 18px;color:#fff;background:rgba(255,255,255,.14);font-weight:900}#count{font-weight:900}@media(max-width:760px){.theater-slide{min-height:560px;padding:28px}.theater-slide h3{font-size:36px}.theater-metric-wall,.theater-candidate-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="deck">${slideHtml || "<section class=\"slide active\"><article class=\"theater-slide\"><h3>No slides yet</h3></article></section>"}</main>
+<div class="controls"><button id="prev">Previous</button><span id="count">1 / ${Math.max(1, slides.length)}</span><button id="next">Next</button></div>
+<script>
+const slides=[...document.querySelectorAll('.slide')];let i=0;function show(n){i=(n+slides.length)%slides.length;slides.forEach((s,x)=>s.classList.toggle('active',x===i));document.querySelector('#count').textContent=(i+1)+' / '+slides.length}document.querySelector('#prev').onclick=()=>show(i-1);document.querySelector('#next').onclick=()=>show(i+1);addEventListener('keydown',e=>{if(e.key==='ArrowRight')show(i+1);if(e.key==='ArrowLeft')show(i-1)});
+</script>
+</body>
+</html>`;
+}
+
+function renderTheaterModal() {
+  if (!els.theaterModalSlide || !els.theaterModalCounter) return;
+  const slides = theaterSlides();
+  if (!slides.length) return;
+  state.theaterSlide = Math.max(0, Math.min(state.theaterSlide, slides.length - 1));
+  els.theaterModalSlide.innerHTML = theaterSlideHtml(slides[state.theaterSlide]);
+  els.theaterModalCounter.textContent = `${state.theaterSlide + 1} / ${slides.length}`;
+}
+
+function setTheaterModal(open) {
+  if (!els.theaterModal) return;
+  if (open && !theaterSlides().length) {
+    showToast("Load demo or convert CVs first");
+    return;
+  }
+  els.theaterModal.hidden = !open;
+  document.body?.classList?.toggle("theater-open", open);
+  if (open) renderTheaterModal();
+}
+
+function moveTheaterSlide(delta) {
+  const slides = theaterSlides();
+  if (!slides.length) return;
+  state.theaterSlide = (state.theaterSlide + delta + slides.length) % slides.length;
+  renderTheater();
+  if (els.theaterModal && !els.theaterModal.hidden) renderTheaterModal();
+}
+
+function setTheaterSlide(index) {
+  const slides = theaterSlides();
+  if (!slides.length) return;
+  state.theaterSlide = Math.max(0, Math.min(Number(index) || 0, slides.length - 1));
+  renderTheater();
+  if (els.theaterModal && !els.theaterModal.hidden) renderTheaterModal();
+}
+
+function renderTheater() {
+  if (!els.theaterContent) return;
+  const slides = theaterSlides();
+  if (!slides.length) {
+    state.theaterSlide = 0;
+    els.theaterContent.innerHTML = '<div class="empty-state">Load demo or convert CVs to build a presentation.</div>';
+    if (els.copyTheaterScript) els.copyTheaterScript.disabled = true;
+    if (els.downloadTheaterDeck) els.downloadTheaterDeck.disabled = true;
+    if (els.startTheater) els.startTheater.disabled = true;
+    return;
+  }
+
+  if (els.copyTheaterScript) els.copyTheaterScript.disabled = false;
+  if (els.downloadTheaterDeck) els.downloadTheaterDeck.disabled = false;
+  if (els.startTheater) els.startTheater.disabled = false;
+  state.theaterSlide = Math.max(0, Math.min(state.theaterSlide, slides.length - 1));
+  const slide = slides[state.theaterSlide];
+  els.theaterContent.innerHTML = `
+    <div class="theater-workbench">
+      <div class="theater-stage-card">
+        ${theaterSlideHtml(slide)}
+      </div>
+      <aside class="theater-speaker-card">
+        <span class="launch-kicker">Speaker notes</span>
+        <h3>${escapeHtml(slide.title)}</h3>
+        <p>${escapeHtml(slide.note || slide.body)}</p>
+        <div class="theater-controls">
+          <button type="button" class="secondary" data-theater-prev>
+            <svg viewBox="0 0 24 24"><path d="M19 12H5"></path><path d="M11 18l-6-6 6-6"></path></svg>
+            Previous
+          </button>
+          <span>${state.theaterSlide + 1} / ${slides.length}</span>
+          <button type="button" class="secondary" data-theater-next>
+            Next
+            <svg viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>
+          </button>
+        </div>
+      </aside>
+    </div>
+    <div class="theater-rail">
+      ${slides
+        .map(
+          (item, index) => `
+            <button type="button" class="${index === state.theaterSlide ? "active" : ""}" data-theater-slide="${index}">
+              <b>${index + 1}</b>
+              <span>${escapeHtml(item.title)}</span>
+            </button>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
 function commandButtons() {
   return Array.from(els.commandActions?.querySelectorAll?.("[data-command]") || []);
 }
@@ -959,6 +1436,17 @@ async function runCommandDeckAction(command) {
       renderPortal();
       scrollToSection("#portalPanel");
       showToast(state.pipeline.length ? "Client Portal opened" : "Load demo or convert CVs first");
+      break;
+    case "submission":
+      renderSubmission();
+      scrollToSection("#submissionPanel");
+      showToast(state.pipeline.length ? "Submission Studio opened" : "Load demo or convert CVs first");
+      break;
+    case "theater":
+      renderTheater();
+      scrollToSection("#theaterPanel");
+      if (state.pipeline.length) setTheaterModal(true);
+      showToast(state.pipeline.length ? "Showtime Theater opened" : "Load demo or convert CVs first");
       break;
     case "pipeline":
       scrollToSection("#pipelinePanel");
@@ -1150,6 +1638,8 @@ function productBriefText() {
     "- Use pipeline, screening, QA report, batch brief, and office SOP tools for repeat recruitment work.",
     "- Present client-ready decisions through Boardroom Mode and Talent Galaxy visual maps.",
     "- Generate a downloadable Client Portal HTML page for shortlist sharing.",
+    "- Produce client email, WhatsApp copy, and submission pack HTML from Submission Studio.",
+    "- Run Showtime Theater for live client-call presentations and deck export.",
     "",
     "Best users: recruitment agencies, HR teams, office assistants, and client-submission teams who need consistent profile formatting quickly.",
     "",
@@ -1323,6 +1813,8 @@ function renderPipeline() {
   renderBoardroom();
   renderGalaxy();
   renderPortal();
+  renderSubmission();
+  renderTheater();
 }
 
 function updatePipelineStatus(id, status) {
@@ -4085,8 +4577,63 @@ els.portalDemo?.addEventListener("click", async () => {
   scrollToSection("#portalPanel");
 });
 [els.portalClientName, els.portalRoleLabel, els.portalTone].forEach((input) => {
-  input?.addEventListener("input", renderPortal);
-  input?.addEventListener("change", renderPortal);
+  input?.addEventListener("input", () => {
+    renderPortal();
+    renderSubmission();
+    renderTheater();
+  });
+  input?.addEventListener("change", () => {
+    renderPortal();
+    renderSubmission();
+    renderTheater();
+  });
+});
+els.copySubmissionEmail?.addEventListener("click", async () => {
+  await copyText(submissionEmailText());
+  showToast("Submission email copied");
+});
+els.copySubmissionWhatsApp?.addEventListener("click", async () => {
+  await copyText(submissionWhatsAppText());
+  showToast("WhatsApp summary copied");
+});
+els.downloadSubmissionPack?.addEventListener("click", () => {
+  if (!state.pipeline.length) return;
+  downloadTextFile("profileforge-submission-pack.html", submissionPackHtml(), "text/html");
+  showToast("Submission pack downloaded");
+});
+els.submissionDemo?.addEventListener("click", async () => {
+  await loadDemoBatch();
+  scrollToSection("#submissionPanel");
+});
+[els.submissionClientContact, els.submissionSenderName, els.submissionTone].forEach((input) => {
+  input?.addEventListener("input", renderSubmission);
+  input?.addEventListener("change", renderSubmission);
+});
+els.copyTheaterScript?.addEventListener("click", async () => {
+  await copyText(theaterScriptText());
+  showToast("Showtime script copied");
+});
+els.downloadTheaterDeck?.addEventListener("click", () => {
+  if (!state.pipeline.length) return;
+  downloadTextFile("profileforge-showtime-theater.html", theaterDeckHtml(), "text/html");
+  showToast("Showtime deck downloaded");
+});
+els.startTheater?.addEventListener("click", () => setTheaterModal(true));
+els.theaterDemo?.addEventListener("click", async () => {
+  await loadDemoBatch();
+  scrollToSection("#theaterPanel");
+});
+els.theaterContent?.addEventListener("click", (event) => {
+  if (event.target.closest?.("[data-theater-prev]")) moveTheaterSlide(-1);
+  if (event.target.closest?.("[data-theater-next]")) moveTheaterSlide(1);
+  const slideButton = event.target.closest?.("[data-theater-slide]");
+  if (slideButton) setTheaterSlide(slideButton.dataset.theaterSlide);
+});
+els.closeTheater?.addEventListener("click", () => setTheaterModal(false));
+els.theaterModalPrev?.addEventListener("click", () => moveTheaterSlide(-1));
+els.theaterModalNext?.addEventListener("click", () => moveTheaterSlide(1));
+els.theaterModal?.addEventListener("click", (event) => {
+  if (event.target === els.theaterModal) setTheaterModal(false);
 });
 els.loadDemo?.addEventListener("click", loadDemoBatch);
 els.copyAssistantGuide?.addEventListener("click", async () => {
@@ -4173,7 +4720,13 @@ window.addEventListener("load", updateConvertState);
 window.addEventListener("load", syncBackToTop);
 window.addEventListener("scroll", syncBackToTop, { passive: true });
 document.addEventListener?.("keydown", (event) => {
-  if (event.key === "Escape") setCommandDeck(false);
+  const theaterOpen = els.theaterModal && !els.theaterModal.hidden;
+  if (event.key === "Escape") {
+    setCommandDeck(false);
+    setTheaterModal(false);
+  }
+  if (theaterOpen && event.key === "ArrowRight") moveTheaterSlide(1);
+  if (theaterOpen && event.key === "ArrowLeft") moveTheaterSlide(-1);
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
     event.preventDefault();
     setCommandDeck(true);

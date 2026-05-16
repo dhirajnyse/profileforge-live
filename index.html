@@ -95,6 +95,14 @@
         </label>
 
         <label class="option-row">
+          <input id="singleSheetWorkbook" type="checkbox" />
+          <span>
+            <strong>Put combined profiles on one sheet</strong>
+            <small>Profiles are stacked in the same order as uploaded PDFs</small>
+          </span>
+        </label>
+
+        <label class="option-row">
           <input id="reviewBeforeExcel" type="checkbox" checked />
           <span>
             <strong>Review extracted fields before Excel</strong>
@@ -342,6 +350,6 @@
     </section>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=20260506-review-before-excel"></script>
+    <script src="./app.js?v=20260516-single-sheet"></script>
   </body>
 </html>

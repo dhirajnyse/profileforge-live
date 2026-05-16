@@ -44,6 +44,7 @@ const els = {
   saveMapping: document.querySelector("#saveMapping"),
   resetMapping: document.querySelector("#resetMapping"),
   combinedWorkbook: document.querySelector("#combinedWorkbook"),
+  singleSheetWorkbook: document.querySelector("#singleSheetWorkbook"),
   reviewBeforeExcel: document.querySelector("#reviewBeforeExcel"),
   chooseFiles: document.querySelector("#chooseFiles"),
   chooseFolder: document.querySelector("#chooseFolder"),
@@ -1174,25 +1175,26 @@ function cellXml(row, col, value, style) {
   return `<c r="${ref}" s="${style}" t="inlineStr"><is><t>${xmlEscape(value)}</t></is></c>`;
 }
 
-function rowXml(rowNumber, values, height) {
+function rowXml(rowNumber, values, height, styleRowNumber = rowNumber) {
   const cells = values
     .map((value, index) => {
       const col = index + 1;
       let style = 2;
-      if (rowNumber === 1) style = 1;
+      if (styleRowNumber === 1) style = 1;
       else if (col === 1) style = 3;
-      else if (col === 2 && rowNumber !== 13) style = 4;
-      else if (rowNumber === 13 && col === 2) style = 5;
-      else if (rowNumber === 13 && col === 3) style = 6;
+      else if (col === 2 && styleRowNumber !== 13) style = 4;
+      else if (styleRowNumber === 13 && col === 2) style = 5;
+      else if (styleRowNumber === 13 && col === 3) style = 6;
       return cellXml(rowNumber, col, value, style);
     })
     .join("");
   return `<row r="${rowNumber}" ht="${height}" customHeight="1">${cells}</row>`;
 }
 
+const PROFILE_ROW_HEIGHTS = [37.5, 22.5, 22.5, 22.5, 22.5, 66, 81, 51, 39, 36, 88.5, 9, 33];
+
 function sheetXml(profile) {
-  const heights = [37.5, 22.5, 22.5, 22.5, 22.5, 66, 81, 51, 39, 36, 88.5, 9, 33];
-  const rows = profileTable(profile).map((values, index) => rowXml(index + 1, values, heights[index])).join("");
+  const rows = profileTable(profile).map((values, index) => rowXml(index + 1, values, PROFILE_ROW_HEIGHTS[index])).join("");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>
@@ -1208,6 +1210,43 @@ function sheetXml(profile) {
   <printOptions horizontalCentered="1" gridLines="0"/>
   <pageMargins left="0.25" right="0.25" top="0.35" bottom="0.35" header="0.1" footer="0.1"/>
   <pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="1" horizontalDpi="300" verticalDpi="300"/>
+  <headerFooter><oddFooter>&amp;L&amp;F&amp;C&amp;A&amp;R&amp;P/&amp;N</oddFooter></headerFooter>
+</worksheet>`;
+}
+
+function stackedSheetData(records) {
+  let rowNumber = 1;
+  const rows = [];
+  records.forEach((record, recordIndex) => {
+    profileTable(record.profile).forEach((values, index) => {
+      rows.push(rowXml(rowNumber, values, PROFILE_ROW_HEIGHTS[index], index + 1));
+      rowNumber += 1;
+    });
+    if (recordIndex < records.length - 1) {
+      rows.push(`<row r="${rowNumber}" ht="9" customHeight="1"/>`);
+      rowNumber += 1;
+    }
+  });
+  return { rows: rows.join(""), totalRows: Math.max(1, rowNumber - 1) };
+}
+
+function stackedSheetXml(records) {
+  const { rows, totalRows } = stackedSheetData(records);
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>
+  <dimension ref="A1:C${totalRows}"/>
+  <sheetViews><sheetView workbookViewId="0" showGridLines="0" defaultGridColor="0" colorId="1"/></sheetViews>
+  <sheetFormatPr defaultRowHeight="15"/>
+  <cols>
+    <col min="1" max="1" width="5.25" customWidth="1"/>
+    <col min="2" max="2" width="24.23" customWidth="1"/>
+    <col min="3" max="3" width="96.23" customWidth="1"/>
+  </cols>
+  <sheetData>${rows}</sheetData>
+  <printOptions horizontalCentered="1" gridLines="0"/>
+  <pageMargins left="0.25" right="0.25" top="0.35" bottom="0.35" header="0.1" footer="0.1"/>
+  <pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0" horizontalDpi="300" verticalDpi="300"/>
   <headerFooter><oddFooter>&amp;L&amp;F&amp;C&amp;A&amp;R&amp;P/&amp;N</oddFooter></headerFooter>
 </worksheet>`;
 }
@@ -1278,7 +1317,7 @@ function workbookXml(sheets) {
     .join("");
   const printAreas = sheets
     .map((sheet, index) => {
-      const ref = `'${sheet.name.replace(/'/g, "''")}'!$A$1:$C$13`;
+      const ref = sheet.printArea || `'${sheet.name.replace(/'/g, "''")}'!$A$1:$C$13`;
       return `<definedName name="_xlnm.Print_Area" localSheetId="${index}">${xmlEscape(ref)}</definedName>`;
     })
     .join("");
@@ -1368,6 +1407,35 @@ async function createWorkbookBlob(records) {
     compressionOptions: { level: 6 },
   });
   return bytes;
+}
+
+async function createStackedWorkbookBlob(records) {
+  const zip = new JSZip();
+  const props = docPropsXml();
+  const { totalRows } = stackedSheetData(records);
+  const sheetName = "All Profiles";
+  const sheets = [
+    {
+      name: sheetName,
+      printArea: `'${sheetName}'!$A$1:$C$${totalRows}`,
+    },
+  ];
+
+  zip.file("[Content_Types].xml", contentTypesXml(1));
+  zip.file("_rels/.rels", packageRelsXml());
+  zip.file("docProps/core.xml", props.core);
+  zip.file("docProps/app.xml", props.app);
+  zip.file("xl/workbook.xml", workbookXml(sheets));
+  zip.file("xl/_rels/workbook.xml.rels", workbookRelsXml(1));
+  zip.file("xl/styles.xml", stylesXml());
+  zip.file("xl/worksheets/sheet1.xml", stackedSheetXml(records));
+
+  return zip.generateAsync({
+    type: "blob",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  });
 }
 
 function xmlDecodeAttr(value) {
@@ -1923,6 +1991,13 @@ async function createProfileWorkbookBlob(records, templateSource = null) {
   return createWorkbookBlob(records);
 }
 
+async function createCombinedWorkbookBlob(records, templateSource = null) {
+  if (els.singleSheetWorkbook.checked) {
+    return createStackedWorkbookBlob(records);
+  }
+  return createProfileWorkbookBlob(records, templateSource);
+}
+
 function makeResultFileName(profile, sourceName, usedNames) {
   const base = safeName([profile.roleCode, profile.candidateName || sourceName, "Profile"].filter(Boolean).join("-"), safeName(sourceName, "profile"));
   let candidate = `${base}.xlsx`;
@@ -2155,7 +2230,7 @@ async function convertFilesDirectly() {
   }
 
   if (successful.length && els.combinedWorkbook.checked) {
-    const combinedBlob = await createProfileWorkbookBlob(successful, templateSource);
+    const combinedBlob = await createCombinedWorkbookBlob(successful, templateSource);
     const combinedUrl = createDownloadUrl(combinedBlob);
     setDownloadLink(els.downloadCombined, combinedUrl);
   }
@@ -2163,7 +2238,7 @@ async function convertFilesDirectly() {
   if (successful.length) {
     addPipelineRecords(successful);
     if (els.combinedWorkbook.checked) {
-      const combinedForZip = await createProfileWorkbookBlob(successful, templateSource);
+      const combinedForZip = await createCombinedWorkbookBlob(successful, templateSource);
       zip.file("combined-cv-profiles.xlsx", combinedForZip);
     }
     const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
@@ -2238,14 +2313,14 @@ async function generateReviewedExcel() {
   }
 
   if (successful.length && els.combinedWorkbook.checked) {
-    const combinedBlob = await createProfileWorkbookBlob(successful, templateSource);
+    const combinedBlob = await createCombinedWorkbookBlob(successful, templateSource);
     setDownloadLink(els.downloadCombined, createDownloadUrl(combinedBlob));
   }
 
   if (successful.length) {
     addPipelineRecords(successful);
     if (els.combinedWorkbook.checked) {
-      const combinedForZip = await createProfileWorkbookBlob(successful, templateSource);
+      const combinedForZip = await createCombinedWorkbookBlob(successful, templateSource);
       zip.file("combined-cv-profiles.xlsx", combinedForZip);
     }
     const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });

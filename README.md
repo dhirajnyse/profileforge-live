@@ -8,6 +8,7 @@ Static GitHub Pages app for converting PDF CVs into Excel profile workbooks.
 - Accepts multiple PDF CVs or a folder of PDFs.
 - Creates individual `.xlsx` profile files.
 - Optionally creates one combined workbook with one sheet per PDF.
+- Can also create a combined workbook where all profiles are stacked on one worksheet in upload order.
 - Supports a custom `.xlsx` profile template while keeping the built-in template as default.
 - Lets users map extracted fields to custom template cells and saves that mapping in the browser.
 - Includes an optional review step so extracted profile fields can be edited before Excel generation.

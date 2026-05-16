@@ -704,17 +704,54 @@ function applyRecipe(recipe) {
   renderTaskPlan();
 }
 
+function fileKey(file) {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
 function addFiles(fileList) {
   const incoming = Array.from(fileList || []).filter((file) => /\.pdf$/i.test(file.name));
-  const existingKeys = new Set(state.files.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
+  const existingKeys = new Set(state.files.map(fileKey));
   for (const file of incoming) {
-    const key = `${file.name}:${file.size}:${file.lastModified}`;
+    const key = fileKey(file);
     if (!existingKeys.has(key)) {
       state.files.push(file);
       existingKeys.add(key);
     }
   }
   renderSelectedFiles();
+  updateConvertState();
+}
+
+function reorderReviewItemsByFileOrder() {
+  if (!state.reviewItems.length) return;
+  const order = new Map(state.files.map((file, index) => [fileKey(file), index]));
+  state.reviewItems.sort((left, right) => {
+    const leftOrder = order.has(left.fileKey) ? order.get(left.fileKey) : Number.MAX_SAFE_INTEGER;
+    const rightOrder = order.has(right.fileKey) ? order.get(right.fileKey) : Number.MAX_SAFE_INTEGER;
+    return leftOrder - rightOrder;
+  });
+  renderReviewPanel();
+}
+
+function moveSelectedFile(index, direction) {
+  const targetIndex = index + direction;
+  if (targetIndex < 0 || targetIndex >= state.files.length) return;
+  const [file] = state.files.splice(index, 1);
+  state.files.splice(targetIndex, 0, file);
+  renderSelectedFiles();
+  reorderReviewItemsByFileOrder();
+  showToast("PDF order updated");
+}
+
+function removeSelectedFile(index) {
+  const [removed] = state.files.splice(index, 1);
+  if (removed) {
+    const removedKey = fileKey(removed);
+    state.reviewItems = state.reviewItems.filter((item) => item.fileKey !== removedKey);
+  }
+  renderSelectedFiles();
+  reorderReviewItemsByFileOrder();
+  renderReviewPanel();
   updateConvertState();
 }
 
@@ -807,26 +844,26 @@ async function readWorkbookTemplate() {
 function renderSelectedFiles() {
   els.fileCount.textContent = state.files.length ? `${state.files.length} PDF${state.files.length === 1 ? "" : "s"} selected` : "No PDFs selected";
   els.selectedList.innerHTML = "";
-  state.files.slice(0, 80).forEach((file, index) => {
+  state.files.forEach((file, index) => {
     const item = document.createElement("div");
     item.className = "selected-item";
     item.innerHTML = `
-      <span>${escapeHtml(file.name)} - ${formatBytes(file.size)}</span>
-      <button type="button" class="remove-file" aria-label="Remove ${escapeHtml(file.name)}">x</button>
+      <span class="selected-order">${index + 1}</span>
+      <span class="selected-name">${escapeHtml(file.name)} - ${formatBytes(file.size)}</span>
+      <div class="selected-actions">
+        <button type="button" class="order-file" data-move="-1" aria-label="Move ${escapeHtml(file.name)} up" ${index === 0 ? "disabled" : ""}>^</button>
+        <button type="button" class="order-file" data-move="1" aria-label="Move ${escapeHtml(file.name)} down" ${index === state.files.length - 1 ? "disabled" : ""}>v</button>
+        <button type="button" class="remove-file" aria-label="Remove ${escapeHtml(file.name)}">x</button>
+      </div>
     `;
-    item.querySelector("button").addEventListener("click", () => {
-      state.files.splice(index, 1);
-      renderSelectedFiles();
-      updateConvertState();
+    item.querySelectorAll("[data-move]").forEach((button) => {
+      button.addEventListener("click", () => moveSelectedFile(index, Number(button.dataset.move)));
+    });
+    item.querySelector(".remove-file").addEventListener("click", () => {
+      removeSelectedFile(index);
     });
     els.selectedList.appendChild(item);
   });
-  if (state.files.length > 80) {
-    const more = document.createElement("div");
-    more.className = "selected-item";
-    more.textContent = `${state.files.length - 80} more PDFs`;
-    els.selectedList.appendChild(more);
-  }
 }
 
 function updateConvertState() {
@@ -838,6 +875,17 @@ function updateConvertState() {
   if (!librariesReady) {
     els.appStatus.textContent = "Libraries loading";
   }
+}
+
+function syncCombinedOptions(source = "") {
+  if (source === "combined" && !els.combinedWorkbook.checked) {
+    els.singleSheetWorkbook.checked = false;
+  } else if (els.singleSheetWorkbook.checked) {
+    els.combinedWorkbook.checked = true;
+  }
+  const singleSheetAllowed = els.combinedWorkbook.checked;
+  els.singleSheetWorkbook.disabled = !singleSheetAllowed;
+  els.singleSheetWorkbook.closest?.(".option-row")?.classList.toggle("option-disabled", !singleSheetAllowed);
 }
 
 function normalizeLine(line) {
@@ -2145,6 +2193,7 @@ async function extractProfilesForReview() {
       state.reviewItems.push({
         id: `${Date.now()}-${index}-${Math.random().toString(16).slice(2)}`,
         status: "ready",
+        fileKey: fileKey(file),
         sourceName: file.name,
         profile,
       });
@@ -2152,6 +2201,7 @@ async function extractProfilesForReview() {
       state.reviewItems.push({
         id: `${Date.now()}-${index}-${Math.random().toString(16).slice(2)}`,
         status: "error",
+        fileKey: fileKey(file),
         sourceName: file.name,
         error: error.message,
       });
@@ -2348,6 +2398,8 @@ els.chooseFolder.addEventListener("click", () => els.pdfFolder.click());
 els.chooseTemplate.addEventListener("click", () => els.templateFile.click());
 els.pdfFiles.addEventListener("change", () => addFiles(els.pdfFiles.files));
 els.pdfFolder.addEventListener("change", () => addFiles(els.pdfFolder.files));
+els.combinedWorkbook.addEventListener("change", () => syncCombinedOptions("combined"));
+els.singleSheetWorkbook.addEventListener("change", () => syncCombinedOptions("single"));
 els.reviewBeforeExcel.addEventListener("change", updateConvertState);
 els.templateFile.addEventListener("change", () => handleTemplateFile(els.templateFile.files));
 els.clearTemplate.addEventListener("click", () => {
@@ -2433,6 +2485,7 @@ els.dropzone.addEventListener("drop", (event) => addFiles(event.dataTransfer.fil
 window.addEventListener("load", updateConvertState);
 state.templateMapping = loadTemplateMapping();
 renderTemplateMapper();
+syncCombinedOptions();
 updateTemplateUi();
 loadPipeline();
 renderPipeline();

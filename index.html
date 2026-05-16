@@ -9,7 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   </head>
-  <body>
+  <body class="theme-pop">
     <header class="app-header">
       <div class="brand">
         <img class="brand-logo" src="./assets/profileforge-logo.svg" alt="ProfileForge" />
@@ -19,6 +19,10 @@
         </div>
       </div>
       <div class="header-status">
+        <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3v18"></path><path d="M5 8h14"></path><path d="M5 16h14"></path></svg>
+          Color Pop
+        </button>
         <span class="header-chip">
           <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M8 9h8"></path><path d="M8 13h5"></path></svg>
           Calibri 10
@@ -212,6 +216,8 @@
             <div class="progress-fill" id="progressFill"></div>
           </div>
         </div>
+
+        <div class="launchpad" id="launchpad"></div>
 
         <div class="review-panel" id="reviewPanel" hidden>
           <div class="review-heading">
@@ -435,6 +441,6 @@
     </section>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=20260516-ui-polish"></script>
+    <script src="./app.js?v=20260516-color-pop"></script>
   </body>
 </html>

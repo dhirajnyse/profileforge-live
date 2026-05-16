@@ -45,6 +45,7 @@ const els = {
   appStatus: document.querySelector("#appStatus"),
   pdfFiles: document.querySelector("#pdfFiles"),
   pdfFolder: document.querySelector("#pdfFolder"),
+  themeToggle: document.querySelector("#themeToggle"),
   templateFile: document.querySelector("#templateFile"),
   templateModePill: document.querySelector("#templateModePill"),
   templateStatus: document.querySelector("#templateStatus"),
@@ -68,6 +69,7 @@ const els = {
   jobStatus: document.querySelector("#jobStatus"),
   jobCounts: document.querySelector("#jobCounts"),
   progressFill: document.querySelector("#progressFill"),
+  launchpad: document.querySelector("#launchpad"),
   reviewPanel: document.querySelector("#reviewPanel"),
   reviewSummary: document.querySelector("#reviewSummary"),
   qualitySummary: document.querySelector("#qualitySummary"),
@@ -192,6 +194,20 @@ function storageSet(key, value) {
   } catch {
     // Local storage can be blocked in private browser contexts.
   }
+}
+
+function setThemeMode(mode) {
+  const usePop = mode !== "classic";
+  document.body?.classList?.toggle("theme-pop", usePop);
+  if (els.themeToggle) {
+    els.themeToggle.setAttribute("aria-pressed", String(usePop));
+    els.themeToggle.innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 3v18"></path><path d="M5 8h14"></path><path d="M5 16h14"></path></svg>${usePop ? "Color Pop" : "Classic"}`;
+  }
+  storageSet("profileforge.theme.v1", usePop ? "pop" : "classic");
+}
+
+function loadThemeMode() {
+  setThemeMode(storageGet("profileforge.theme.v1", "pop"));
 }
 
 function loadTemplateMapping() {
@@ -781,12 +797,14 @@ function updateTemplateUi() {
     els.clearTemplate.hidden = false;
     els.templateMapper.hidden = false;
     renderTemplateMapper();
+    updateLaunchpad();
     return;
   }
   els.templateModePill.textContent = "Built-in Profile Template";
   els.templateStatus.textContent = "Default ProfileForge template";
   els.clearTemplate.hidden = true;
   els.templateMapper.hidden = true;
+  updateLaunchpad();
 }
 
 function handleTemplateFile(fileList) {
@@ -882,6 +900,7 @@ function renderSelectedFiles() {
     });
     els.selectedList.appendChild(item);
   });
+  updateLaunchpad();
 }
 
 function updateConvertState() {
@@ -893,6 +912,7 @@ function updateConvertState() {
   if (!librariesReady) {
     els.appStatus.textContent = "Libraries loading";
   }
+  updateLaunchpad();
 }
 
 function syncCombinedOptions(source = "") {
@@ -910,10 +930,62 @@ function syncCombinedOptions(source = "") {
   els.stackDirectionOptions.forEach((option) => {
     option.disabled = !singleSheetActive;
   });
+  updateLaunchpad();
 }
 
 function selectedStackDirection() {
   return els.stackDirectionOptions.find((option) => option.checked)?.value || "vertical";
+}
+
+function launchpadCard(icon, label, value, detail, accent = "") {
+  return `
+    <div class="launch-card ${accent}">
+      <span class="launch-icon">${icon}</span>
+      <div>
+        <small>${escapeHtml(label)}</small>
+        <strong>${escapeHtml(value)}</strong>
+        <p>${escapeHtml(detail)}</p>
+      </div>
+    </div>
+  `;
+}
+
+function updateLaunchpad() {
+  if (!els.launchpad) return;
+  const hasActiveOutput = state.reviewItems.length || els.resultsBody?.querySelector?.("tr:not(.empty-row)");
+  els.launchpad.hidden = Boolean(hasActiveOutput);
+  if (hasActiveOutput) return;
+
+  const pdfCount = state.files.length;
+  const totalSize = state.files.reduce((total, file) => total + (file.size || 0), 0);
+  const outputMode = els.singleSheetWorkbook.checked
+    ? `One sheet - ${selectedStackDirection()}`
+    : els.combinedWorkbook.checked
+      ? "Combined workbook"
+      : "Individual files";
+  const outputDetail = els.singleSheetWorkbook.checked
+    ? "Profiles placed in your uploaded order."
+    : els.combinedWorkbook.checked
+      ? "One workbook plus individual profile files."
+      : "Only separate Excel files will be prepared.";
+  const reviewMode = els.reviewBeforeExcel.checked ? "Review first" : "Direct convert";
+  const nextAction = pdfCount ? (els.reviewBeforeExcel.checked ? "Ready to review" : "Ready to convert") : "Add CV PDFs";
+
+  els.launchpad.innerHTML = `
+    <div class="launch-heading">
+      <div>
+        <h3>Smart Launchpad</h3>
+        <p>Live production preview before you run the batch.</p>
+      </div>
+      <span>${escapeHtml(nextAction)}</span>
+    </div>
+    <div class="launch-grid">
+      ${launchpadCard('<svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"></path><path d="M15 3v4h4"></path><path d="M9 13h6"></path><path d="M9 17h4"></path></svg>', "PDF queue", pdfCount ? `${pdfCount} selected` : "No PDFs", pdfCount ? formatBytes(totalSize) : "Choose files or folder", "blue")}
+      ${launchpadCard('<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>', "Template", state.templateFile ? "Custom" : "Built-in", state.templateFile ? state.templateFile.name : "ProfileForge default layout", "green")}
+      ${launchpadCard('<svg viewBox="0 0 24 24"><path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h10"></path><path d="M18 15l2 2-2 2"></path></svg>', "Output", outputMode, outputDetail, "gold")}
+      ${launchpadCard('<svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-5"></path><path d="M20 12a8 8 0 1 1-3-6.2"></path></svg>', "Quality flow", reviewMode, els.reviewBeforeExcel.checked ? "Quality Gate, QA CSV and brief enabled." : "Fast export without manual review.", "blue")}
+    </div>
+  `;
 }
 
 function normalizeLine(line) {
@@ -2506,6 +2578,7 @@ function renderReviewPanel() {
     if (els.copyBatchBrief) els.copyBatchBrief.disabled = true;
     if (els.downloadBatchBrief) els.downloadBatchBrief.disabled = true;
     if (els.downloadQualityReport) els.downloadQualityReport.disabled = true;
+    updateLaunchpad();
     return;
   }
 
@@ -2514,6 +2587,7 @@ function renderReviewPanel() {
   els.reviewSummary.textContent = reviewSummaryText();
   els.generateReviewed.disabled = ready === 0;
   updateQualitySummary();
+  updateLaunchpad();
 
   els.reviewList.innerHTML = state.reviewItems
     .map((item, index) => {
@@ -2576,6 +2650,7 @@ function clearReviewQueue() {
 function renderResults(results) {
   if (!results.length) {
     els.resultsBody.innerHTML = '<tr class="empty-row"><td colspan="5">Awaiting conversion</td></tr>';
+    updateLaunchpad();
     return;
   }
 
@@ -2598,6 +2673,7 @@ function renderResults(results) {
       `;
     })
     .join("");
+  updateLaunchpad();
 }
 
 async function extractProfilesForReview() {
@@ -2829,10 +2905,14 @@ async function convertCvs() {
 els.chooseFiles.addEventListener("click", () => els.pdfFiles.click());
 els.chooseFolder.addEventListener("click", () => els.pdfFolder.click());
 els.chooseTemplate.addEventListener("click", () => els.templateFile.click());
+els.themeToggle?.addEventListener("click", () => {
+  setThemeMode(document.body?.classList?.contains("theme-pop") ? "classic" : "pop");
+});
 els.pdfFiles.addEventListener("change", () => addFiles(els.pdfFiles.files));
 els.pdfFolder.addEventListener("change", () => addFiles(els.pdfFolder.files));
 els.combinedWorkbook.addEventListener("change", () => syncCombinedOptions("combined"));
 els.singleSheetWorkbook.addEventListener("change", () => syncCombinedOptions("single"));
+els.stackDirectionOptions.forEach((option) => option.addEventListener("change", updateLaunchpad));
 els.reviewBeforeExcel.addEventListener("change", updateConvertState);
 els.templateFile.addEventListener("change", () => handleTemplateFile(els.templateFile.files));
 els.clearTemplate.addEventListener("click", () => {
@@ -2936,6 +3016,7 @@ document.querySelectorAll?.("[data-recipe]").forEach((button) => {
 els.dropzone.addEventListener("drop", (event) => addFiles(event.dataTransfer.files));
 
 window.addEventListener("load", updateConvertState);
+loadThemeMode();
 state.templateMapping = loadTemplateMapping();
 renderTemplateMapper();
 syncCombinedOptions();

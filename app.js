@@ -15,6 +15,15 @@ const PROFILE_FIELDS = [
 const LONG_REVIEW_FIELDS = new Set(["relevantExperience", "keySkills", "projectsHandled", "note"]);
 const PROFILE_NOTE =
   "We can provide detailed CV as there is a limited space in this format for projects listing, so we mentioned recent ones";
+const FIELD_FALLBACKS = {
+  roleCode: "Role code to be confirmed",
+  yearsOfExperience: "Experience to be confirmed",
+  keySkills: "Skills to be confirmed during screening.",
+  certifications: "Certification details to be confirmed during screening.",
+  educationalQualifications: "Education details to be confirmed during screening.",
+  previousEmployer: "Employment history to be confirmed during screening.",
+  projectsHandled: "Project details to be confirmed during screening.",
+};
 
 const DEFAULT_TEMPLATE_MAPPING = PROFILE_FIELDS.reduce((mapping, field) => {
   mapping[field.id] = field.defaultCell;
@@ -216,6 +225,11 @@ function parseYearsNumber(value) {
   return match ? Number(match[0]) : 0;
 }
 
+function isPlaceholderValue(value) {
+  const text = String(value || "").trim();
+  return !text || /not specified|extracted from cv|to be confirmed/i.test(text);
+}
+
 function candidateScore(profile) {
   const years = Math.min(parseYearsNumber(profile.yearsOfExperience), 15);
   const skills = String(profile.keySkills || "")
@@ -223,8 +237,7 @@ function candidateScore(profile) {
     .map((item) => item.trim())
     .filter(Boolean).length;
   const details = ["certifications", "educationalQualifications", "previousEmployer", "projectsHandled"].filter((key) => {
-    const value = String(profile[key] || "");
-    return value && !/not specified/i.test(value);
+    return !isPlaceholderValue(profile[key]);
   }).length;
   return Math.min(98, Math.max(42, 42 + years * 3 + Math.min(skills, 12) * 2 + details * 4));
 }
@@ -443,8 +456,7 @@ function missingDataFields(item) {
   ];
   return checks
     .filter(([, value]) => {
-      const text = String(value || "").trim();
-      return !text || /not specified|extracted from cv/i.test(text);
+      return isPlaceholderValue(value);
     })
     .map(([label]) => label);
 }
@@ -889,7 +901,8 @@ function syncCombinedOptions(source = "") {
   els.singleSheetWorkbook.disabled = !singleSheetAllowed;
   els.singleSheetWorkbook.closest?.(".option-row")?.classList.toggle("option-disabled", !singleSheetAllowed);
   const singleSheetActive = singleSheetAllowed && els.singleSheetWorkbook.checked;
-  els.stackingOptions.hidden = !singleSheetActive;
+  els.stackingOptions.classList.toggle("stacking-options-disabled", !singleSheetActive);
+  els.stackingOptions.setAttribute("aria-disabled", String(!singleSheetActive));
   els.stackDirectionOptions.forEach((option) => {
     option.disabled = !singleSheetActive;
   });
@@ -1047,6 +1060,69 @@ function extractBullets(section) {
   return bullets.map(squash).filter(Boolean);
 }
 
+function isLikelyContactLine(line) {
+  return /@|\b(?:phone|mobile|email|linkedin|github|location|address)\b/i.test(line);
+}
+
+function extractCertificationItems(certs, allLines) {
+  const certPattern =
+    /\b(certified|certification|certificate|aws|azure|google cloud|pmp|scrum|safe|itil|oracle|microsoft|cisco|salesforce|databricks|snowflake|power bi|tableau)\b/i;
+  const fromSection = uniqueItems(certs.filter((line) => !/^certifications?$/i.test(line)));
+  if (fromSection.length) return fromSection;
+  return uniqueItems(
+    allLines.filter((line) => {
+      if (/^certifications?$/i.test(line) || isLikelyContactLine(line)) return false;
+      return certPattern.test(line) && line.length <= 160;
+    }),
+  ).slice(0, 8);
+}
+
+function extractEducationText(education, allLines) {
+  const educationText = trimToWords(education.map(stripBullet).join(" - "), 450);
+  if (educationText) return educationText;
+  const educationPattern =
+    /\b(bachelor|master|b\.?\s?sc|m\.?\s?sc|b\.?\s?tech|m\.?\s?tech|b\.?\s?e\.?|m\.?\s?e\.?|bca|mca|mba|phd|doctorate|diploma|degree|university|college|institute)\b/i;
+  const candidates = uniqueItems(
+    allLines.filter((line) => {
+      if (/^(education|certifications?|technical skills|work experience|professional summary)$/i.test(line)) return false;
+      if (isLikelyContactLine(line)) return false;
+      return educationPattern.test(line) && line.length <= 160;
+    }),
+  );
+  return trimToWords(candidates.slice(0, 6).join(" - "), 450);
+}
+
+function extractEmployerItems(workLines, allLines) {
+  const explicit = extractEmployers(workLines);
+  if (explicit.length) return explicit;
+  const employerPattern = /\b(llc|l\.l\.c|ltd|limited|inc|technologies|technology|solutions|systems|consulting|consultancy|bank|group|global|company|corp|corporation)\b/i;
+  const candidates = uniqueItems(
+    [...workLines, ...allLines].filter((line) => {
+      if (/^[-*]|\b(responsible|developed|managed|built|designed|skills|education|certification)\b/i.test(line)) return false;
+      if (isLikelyContactLine(line) || line.length > 120) return false;
+      return employerPattern.test(line);
+    }),
+  );
+  return candidates.slice(0, 5);
+}
+
+function inferProjectsText(workLines, relevantExperience) {
+  const summarized = summarizeProjects(workLines);
+  if (summarized) return summarized;
+  const cleanWorkLines = uniqueItems(
+    workLines.filter((line) => {
+      if (/^(work experience|professional summary)$/i.test(line)) return false;
+      if (isLikelyContactLine(line) || line.length < 20) return false;
+      return !/^\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)/i.test(line);
+    }),
+  );
+  const fromWork = trimToWords(cleanWorkLines.slice(0, 4).join("; "), 700);
+  if (fromWork) return fromWork;
+  return isPlaceholderValue(relevantExperience)
+    ? ""
+    : trimToWords(`Project exposure aligned to CV experience: ${relevantExperience}`, 700);
+}
+
 function summarizeProjects(workLines) {
   const bullets = extractBullets(workLines);
   const priority = bullets.filter((bullet) =>
@@ -1085,27 +1161,29 @@ function parseProfile(text, fileName) {
     skillItems.push(...uniqueItems(headline.split("|").slice(1)));
   }
 
-  const certificationItems = uniqueItems(certs);
-  const educationText = trimToWords(education.map(stripBullet).join(" - "), 450);
-  const employerItems = extractEmployers(work);
+  const certificationItems = extractCertificationItems(certs, allLines);
+  const educationText = extractEducationText(education, allLines);
+  const employerItems = extractEmployerItems(work, allLines);
 
   const relevantExperience =
     trimToWords(summary.join(" "), 550) ||
     trimToWords(extractBullets(work).slice(0, 3).join("; "), 550) ||
-    "Relevant experience extracted from CV.";
+    trimToWords(firstContent.slice(1, 5).join(" "), 550) ||
+    "Relevant experience to be confirmed during screening.";
+  const projectsHandled = inferProjectsText(work, relevantExperience);
 
   return {
     sourceName: fileName,
-    roleCode: fileParts.roleCode || "",
+    roleCode: fileParts.roleCode || FIELD_FALLBACKS.roleCode,
     roleTitle: titleCaseLight(roleTitle),
     candidateName: titleCaseLight(candidateName),
-    yearsOfExperience: extractYears(cleanText) || "",
+    yearsOfExperience: extractYears(cleanText) || FIELD_FALLBACKS.yearsOfExperience,
     relevantExperience,
-    keySkills: trimToWords(skillItems.join(", "), 850),
-    certifications: certificationItems.length ? trimToWords(certificationItems.join("; "), 550) : "Not specified in CV.",
-    educationalQualifications: educationText || "Not specified in CV.",
-    previousEmployer: employerItems.length ? employerItems.join("; ") : "Not specified in CV.",
-    projectsHandled: summarizeProjects(work) || "Not specified in CV.",
+    keySkills: trimToWords(skillItems.join(", "), 850) || FIELD_FALLBACKS.keySkills,
+    certifications: certificationItems.length ? trimToWords(certificationItems.join("; "), 550) : FIELD_FALLBACKS.certifications,
+    educationalQualifications: educationText || FIELD_FALLBACKS.educationalQualifications,
+    previousEmployer: employerItems.length ? employerItems.join("; ") : FIELD_FALLBACKS.previousEmployer,
+    projectsHandled: projectsHandled || FIELD_FALLBACKS.projectsHandled,
   };
 }
 

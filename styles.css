@@ -781,6 +781,14 @@ button,
   background: #fff;
 }
 
+.stacking-options-disabled {
+  opacity: 0.7;
+}
+
+.stacking-options-disabled label {
+  cursor: not-allowed;
+}
+
 .stacking-options > strong {
   display: block;
   margin-bottom: 8px;

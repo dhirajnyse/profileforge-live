@@ -108,6 +108,7 @@ const els = {
   studioMembers: document.querySelector("#studioMembers"),
   launchMrr: document.querySelector("#launchMrr"),
   launchArr: document.querySelector("#launchArr"),
+  backToTop: document.querySelector("#backToTop"),
   toast: document.querySelector("#toast"),
 };
 
@@ -288,6 +289,12 @@ function launchChecklistText() {
     "4. Start with Stripe, Gumroad, or PayPal checkout after first user feedback.",
     "5. Track first 10 users: profiles converted, templates requested, and missing fields reported.",
   ].join("\n");
+}
+
+function syncBackToTop() {
+  if (!els.backToTop) return;
+  const top = Number(window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0);
+  els.backToTop.classList.toggle("show", top > 420);
 }
 
 function parseYearsNumber(value) {
@@ -3042,6 +3049,13 @@ els.copyLaunchChecklist?.addEventListener("click", async () => {
 [els.starterMembers, els.proMembers, els.studioMembers].forEach((input) => {
   input?.addEventListener("input", renderLaunchRevenue);
 });
+els.backToTop?.addEventListener("click", () => {
+  if (window.scrollTo) {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } else if (document.documentElement) {
+    document.documentElement.scrollTop = 0;
+  }
+});
 els.clearPipeline?.addEventListener("click", () => {
   state.pipeline = [];
   state.matchResults = [];
@@ -3077,6 +3091,8 @@ document.querySelectorAll?.("[data-recipe]").forEach((button) => {
 els.dropzone.addEventListener("drop", (event) => addFiles(event.dataTransfer.files));
 
 window.addEventListener("load", updateConvertState);
+window.addEventListener("load", syncBackToTop);
+window.addEventListener("scroll", syncBackToTop, { passive: true });
 loadThemeMode();
 renderLaunchRevenue();
 state.templateMapping = loadTemplateMapping();

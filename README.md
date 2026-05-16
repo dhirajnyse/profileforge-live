@@ -19,6 +19,7 @@ Static GitHub Pages app for converting PDF CVs into Excel profile workbooks.
 - Uses a polished office-ready interface with icon navigation, workflow graphics, enhanced upload surfaces, and richer review cards.
 - Shows a Smart Launchpad in the Results area with live PDF queue, template, output, and quality-flow preview.
 - Includes Color Pop and Classic visual modes, with coherent styling across Converter, Pipeline, and Screening sections.
+- Includes a floating back-to-top arrow for long workflow and launch pages.
 - Adds a Launch Desk with simple USD membership pricing, launch checklist copy, and a small revenue preview calculator.
 - Sets generated Excel output to Calibri 10.
 - Sets every profile sheet to print as A4 portrait, fit to 1 page wide by 1 page tall, with print area `A1:C13`.

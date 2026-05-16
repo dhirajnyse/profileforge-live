@@ -384,6 +384,132 @@ body.theme-pop .workflow-step:nth-child(3) .workflow-icon {
   background: linear-gradient(145deg, #edfff7, #ffffff);
 }
 
+.assistant-guide {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.4fr) auto;
+  gap: 14px;
+  align-items: stretch;
+  margin: 16px 32px 0;
+  padding: 14px;
+  border: 1px solid rgba(197, 209, 222, 0.82);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 253, 0.92)),
+    repeating-linear-gradient(90deg, transparent 0 30px, rgba(31, 78, 120, 0.032) 30px 31px);
+  box-shadow: 0 14px 30px rgba(23, 32, 42, 0.06);
+}
+
+.assistant-guide::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(90deg, #214f8f, #00a6d6, #e0449a, #f1a416, #24be86);
+}
+
+.guide-intro {
+  padding: 8px 4px;
+}
+
+.guide-intro h2,
+.guide-intro p,
+.guide-steps article p {
+  margin: 0;
+}
+
+.guide-intro h2 {
+  margin-top: 10px;
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+.guide-intro p {
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.48;
+}
+
+.guide-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.guide-steps article {
+  min-height: 132px;
+  padding: 13px;
+  border: 1px solid rgba(197, 209, 222, 0.88);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff, #f8fbfd);
+  box-shadow: 0 8px 16px rgba(23, 32, 42, 0.04);
+}
+
+.guide-steps span,
+.guide-steps strong,
+.guide-steps p {
+  display: block;
+}
+
+.guide-steps span {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.guide-steps strong {
+  margin-top: 8px;
+  font-size: 16px;
+}
+
+.guide-steps p {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.guide-actions {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  min-width: 136px;
+}
+
+.guide-link {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  text-decoration: none;
+}
+
+body.theme-pop .assistant-guide {
+  border-color: rgba(0, 166, 214, 0.16);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(237, 248, 255, 0.88) 46%, rgba(255, 240, 247, 0.74)),
+    repeating-linear-gradient(135deg, transparent 0 26px, rgba(224, 68, 154, 0.04) 26px 27px);
+}
+
+body.theme-pop .guide-steps article:nth-child(1) {
+  border-color: rgba(0, 166, 214, 0.22);
+  background: linear-gradient(180deg, #ffffff, #edf8ff);
+}
+
+body.theme-pop .guide-steps article:nth-child(2) {
+  border-color: rgba(224, 68, 154, 0.22);
+  background: linear-gradient(180deg, #ffffff, #fff0f7);
+}
+
+body.theme-pop .guide-steps article:nth-child(3) {
+  border-color: rgba(36, 190, 134, 0.24);
+  background: linear-gradient(180deg, #ffffff, #edfff7);
+}
+
 .workspace {
   position: relative;
   z-index: 1;
@@ -2262,6 +2388,16 @@ tr:last-child td {
   transform: translateY(0) scale(1);
 }
 
+.back-to-top.show.is-resting {
+  opacity: 0.72;
+  transform: translateY(0) scale(0.92);
+}
+
+.back-to-top.show.is-active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
 .back-to-top:hover {
   box-shadow: 0 20px 40px rgba(31, 78, 120, 0.34);
   transform: translateY(-2px) scale(1);
@@ -2318,11 +2454,17 @@ body.theme-pop .back-to-top {
     margin: 14px 20px 0;
   }
 
+  .assistant-guide {
+    margin: 14px 20px 0;
+  }
+
   .workflow-ribbon::before {
     display: none;
   }
 
   .workflow-grid,
+  .assistant-guide,
+  .guide-steps,
   .metric-grid,
   .task-board,
   .screening-grid,

@@ -101,6 +101,7 @@ const els = {
   comparisonBody: document.querySelector("#comparisonBody"),
   copyMatches: document.querySelector("#copyMatches"),
   exportMatches: document.querySelector("#exportMatches"),
+  copyAssistantGuide: document.querySelector("#copyAssistantGuide"),
   copyPricing: document.querySelector("#copyPricing"),
   copyLaunchChecklist: document.querySelector("#copyLaunchChecklist"),
   starterMembers: document.querySelector("#starterMembers"),
@@ -291,10 +292,29 @@ function launchChecklistText() {
   ].join("\n");
 }
 
+function assistantGuideText() {
+  return [
+    "ProfileForge Office SOP",
+    "",
+    "1. Open ProfileForge and use Files or Folder to add all CV PDFs.",
+    "2. Keep the PDF order as the required client/profile sequence. Use the arrow controls to adjust order before conversion.",
+    "3. Keep Review extracted fields before Excel switched on.",
+    "4. Review each candidate name, role, years, key skills, education, employer, and project notes.",
+    "5. Click Generate Excel.",
+    "6. Download the combined workbook for the client pack, and download the ZIP if individual profile files are needed.",
+    "7. Open the Excel workbook once and confirm Calibri 10, A4 portrait, fit-to-page print preview.",
+    "",
+    "Privacy note: In this browser version, CV PDFs are processed locally in the browser and are not uploaded to a server.",
+  ].join("\n");
+}
+
 function syncBackToTop() {
   if (!els.backToTop) return;
   const top = Number(window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0);
-  els.backToTop.classList.toggle("show", top > 420);
+  const isActive = top > 420;
+  els.backToTop.classList.add("show");
+  els.backToTop.classList.toggle("is-active", isActive);
+  els.backToTop.classList.toggle("is-resting", !isActive);
 }
 
 function parseYearsNumber(value) {
@@ -3037,6 +3057,10 @@ els.copyMatches?.addEventListener("click", async () => {
 });
 els.exportMatches?.addEventListener("click", () => {
   downloadTextFile("profileforge-role-match.csv", matchReportCsv(), "text/csv");
+});
+els.copyAssistantGuide?.addEventListener("click", async () => {
+  await copyText(assistantGuideText());
+  showToast("Assistant SOP copied");
 });
 els.copyPricing?.addEventListener("click", async () => {
   await copyText(launchPricingText());

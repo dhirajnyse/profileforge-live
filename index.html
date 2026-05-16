@@ -88,6 +88,41 @@
       </div>
     </section>
 
+    <section class="assistant-guide" id="assistantGuide" aria-label="Assistant handoff">
+      <div class="guide-intro">
+        <span class="launch-kicker">Assistant handoff</span>
+        <h2>Run a CV batch in three clean steps</h2>
+        <p>Use this quick desk card when sharing ProfileForge with an office assistant. It keeps the workflow calm: upload PDFs, review extracted fields, then download the Excel pack.</p>
+      </div>
+      <div class="guide-steps">
+        <article>
+          <span>01</span>
+          <strong>Add CV PDFs</strong>
+          <p>Select files or a folder, then reorder profiles if the client needs a specific sequence.</p>
+        </article>
+        <article>
+          <span>02</span>
+          <strong>Review quality</strong>
+          <p>Confirm candidate name, role, years, skills, and any fields marked for screening.</p>
+        </article>
+        <article>
+          <span>03</span>
+          <strong>Export Excel</strong>
+          <p>Download individual files, a combined workbook, or one stacked profile sheet.</p>
+        </article>
+      </div>
+      <div class="guide-actions">
+        <button type="button" class="secondary" id="copyAssistantGuide">
+          <svg viewBox="0 0 24 24"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path></svg>
+          Copy SOP
+        </button>
+        <a class="secondary guide-link" href="#converter">
+          <svg viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>
+          Start batch
+        </a>
+      </div>
+    </section>
+
     <main class="workspace" id="converter">
       <section class="panel setup-panel">
         <div class="panel-heading">
@@ -548,7 +583,7 @@
 
     <button
       type="button"
-      class="back-to-top show"
+      class="back-to-top show is-resting"
       id="backToTop"
       aria-label="Back to top"
       title="Back to top"
@@ -558,6 +593,6 @@
     </button>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=20260516-back-to-top-visible"></script>
+    <script src="./app.js?v=20260516-assistant-handoff"></script>
   </body>
 </html>

@@ -101,6 +101,13 @@ const els = {
   comparisonBody: document.querySelector("#comparisonBody"),
   copyMatches: document.querySelector("#copyMatches"),
   exportMatches: document.querySelector("#exportMatches"),
+  copyPricing: document.querySelector("#copyPricing"),
+  copyLaunchChecklist: document.querySelector("#copyLaunchChecklist"),
+  starterMembers: document.querySelector("#starterMembers"),
+  proMembers: document.querySelector("#proMembers"),
+  studioMembers: document.querySelector("#studioMembers"),
+  launchMrr: document.querySelector("#launchMrr"),
+  launchArr: document.querySelector("#launchArr"),
   toast: document.querySelector("#toast"),
 };
 
@@ -238,6 +245,49 @@ async function copyText(value) {
   input.select();
   document.execCommand("copy");
   input.remove();
+}
+
+function formatUsd(value) {
+  return `$${Math.round(value).toLocaleString("en-US")}`;
+}
+
+function launchMemberCount(input) {
+  return Math.max(0, Number.parseInt(input?.value || "0", 10) || 0);
+}
+
+function renderLaunchRevenue() {
+  if (!els.launchMrr || !els.launchArr) return;
+  const mrr = launchMemberCount(els.starterMembers) * 7 + launchMemberCount(els.proMembers) * 15 + launchMemberCount(els.studioMembers) * 29;
+  els.launchMrr.textContent = formatUsd(mrr);
+  els.launchArr.textContent = `${formatUsd(mrr * 12)} yearly run rate`;
+}
+
+function launchPricingText() {
+  return [
+    "ProfileForge Founding Membership",
+    "",
+    "Starter - $7/month",
+    "100 profiles/month, combined workbook exports, built-in ProfileForge template.",
+    "",
+    "Pro - $15/month",
+    "500 profiles/month, custom Excel template mapping, quality report, and batch brief.",
+    "",
+    "Studio - $29/month",
+    "2,000 profiles/month, team workflow and pipeline tools, priority template setup.",
+    "",
+    "Privacy note: ProfileForge processes PDFs in the browser. CV files are not uploaded to a server in this static version.",
+  ].join("\n");
+}
+
+function launchChecklistText() {
+  return [
+    "ProfileForge Launch Checklist",
+    "1. Connect the custom domain to GitHub Pages.",
+    "2. Add support email and a short privacy note.",
+    "3. Keep Pro as the recommended first paid plan.",
+    "4. Start with Stripe, Gumroad, or PayPal checkout after first user feedback.",
+    "5. Track first 10 users: profiles converted, templates requested, and missing fields reported.",
+  ].join("\n");
 }
 
 function parseYearsNumber(value) {
@@ -2981,6 +3031,17 @@ els.copyMatches?.addEventListener("click", async () => {
 els.exportMatches?.addEventListener("click", () => {
   downloadTextFile("profileforge-role-match.csv", matchReportCsv(), "text/csv");
 });
+els.copyPricing?.addEventListener("click", async () => {
+  await copyText(launchPricingText());
+  showToast("Pricing copied");
+});
+els.copyLaunchChecklist?.addEventListener("click", async () => {
+  await copyText(launchChecklistText());
+  showToast("Launch checklist copied");
+});
+[els.starterMembers, els.proMembers, els.studioMembers].forEach((input) => {
+  input?.addEventListener("input", renderLaunchRevenue);
+});
 els.clearPipeline?.addEventListener("click", () => {
   state.pipeline = [];
   state.matchResults = [];
@@ -3017,6 +3078,7 @@ els.dropzone.addEventListener("drop", (event) => addFiles(event.dataTransfer.fil
 
 window.addEventListener("load", updateConvertState);
 loadThemeMode();
+renderLaunchRevenue();
 state.templateMapping = loadTemplateMapping();
 renderTemplateMapper();
 syncCombinedOptions();

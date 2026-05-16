@@ -14,6 +14,9 @@ Static GitHub Pages app for converting PDF CVs into Excel profile workbooks.
 - Lets users map extracted fields to custom template cells and saves that mapping in the browser.
 - Includes an optional review step so extracted profile fields can be edited before Excel generation.
 - Adds a Profile Quality Gate during review, with readiness scores and quick checks for fields that need confirmation.
+- Adds batch quality metrics and a downloadable QA CSV report for multi-CV review.
+- Generates a copyable and downloadable Batch Intelligence Brief with top candidates, role mix, review focus, and duplicate-name warnings.
+- Uses a polished office-ready interface with icon navigation, workflow graphics, enhanced upload surfaces, and richer review cards.
 - Sets generated Excel output to Calibri 10.
 - Sets every profile sheet to print as A4 portrait, fit to 1 page wide by 1 page tall, with print area `A1:C13`.
 

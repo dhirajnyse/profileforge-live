@@ -70,8 +70,12 @@ const els = {
   progressFill: document.querySelector("#progressFill"),
   reviewPanel: document.querySelector("#reviewPanel"),
   reviewSummary: document.querySelector("#reviewSummary"),
+  qualitySummary: document.querySelector("#qualitySummary"),
   reviewList: document.querySelector("#reviewList"),
   generateReviewed: document.querySelector("#generateReviewed"),
+  copyBatchBrief: document.querySelector("#copyBatchBrief"),
+  downloadBatchBrief: document.querySelector("#downloadBatchBrief"),
+  downloadQualityReport: document.querySelector("#downloadQualityReport"),
   clearReview: document.querySelector("#clearReview"),
   resultsBody: document.querySelector("#resultsBody"),
   downloadCombined: document.querySelector("#downloadCombined"),
@@ -2271,7 +2275,7 @@ function reviewProfileFromCard(item, index) {
   const profile = { ...item.profile };
   for (const field of PROFILE_FIELDS) {
     const input = card?.querySelector(`[data-review-field="${field.id}"]`);
-    if (input) {
+    if (input && "value" in input) {
       profile[field.id] = String(input.value || "").trim();
     }
   }
@@ -2279,17 +2283,192 @@ function reviewProfileFromCard(item, index) {
   return profile;
 }
 
+function currentReviewQualityItems() {
+  return state.reviewItems
+    .map((item, index) => {
+      if (item.status !== "ready") {
+        return {
+          sourceName: item.sourceName,
+          status: "Failed",
+          candidateName: "",
+          roleCode: "",
+          roleTitle: "",
+          yearsOfExperience: "",
+          quality: { score: 0, tone: "risk", label: "Failed", issues: [{ text: item.error || "Unable to extract this PDF." }] },
+        };
+      }
+      const profile = reviewProfileFromCard(item, index);
+      return {
+        sourceName: item.sourceName,
+        status: "Ready",
+        candidateName: profile.candidateName,
+        roleCode: profile.roleCode,
+        roleTitle: profile.roleTitle,
+        yearsOfExperience: profile.yearsOfExperience,
+        profile,
+        quality: profileQuality(profile),
+      };
+    });
+}
+
+function qualitySummaryStats(items = currentReviewQualityItems()) {
+  const readyItems = items.filter((item) => item.status === "Ready");
+  const scores = readyItems.map((item) => item.quality.score);
+  return {
+    total: items.length,
+    extracted: readyItems.length,
+    failed: items.length - readyItems.length,
+    average: scores.length ? Math.round(scores.reduce((total, score) => total + score, 0) / scores.length) : 0,
+    ready: readyItems.filter((item) => item.quality.tone === "ready").length,
+    review: readyItems.filter((item) => item.quality.tone === "review").length,
+    risk: readyItems.filter((item) => item.quality.tone === "risk").length,
+    flagged: readyItems.filter((item) => item.quality.issues.length).length,
+  };
+}
+
+function qualitySummaryHtml(items = currentReviewQualityItems()) {
+  const stats = qualitySummaryStats(items);
+  if (!stats.total) return "";
+  return `
+    <div class="quality-command">
+      <div class="quality-command-card primary">
+        <span>Batch quality</span>
+        <strong>${stats.average || 0}%</strong>
+      </div>
+      <div class="quality-command-card">
+        <span>Ready</span>
+        <strong>${stats.ready}</strong>
+      </div>
+      <div class="quality-command-card">
+        <span>Review</span>
+        <strong>${stats.review}</strong>
+      </div>
+      <div class="quality-command-card">
+        <span>Needs work</span>
+        <strong>${stats.risk + stats.failed}</strong>
+      </div>
+    </div>
+  `;
+}
+
+function updateQualitySummary() {
+  const items = currentReviewQualityItems();
+  if (els.qualitySummary) els.qualitySummary.innerHTML = qualitySummaryHtml(items);
+  const hasReady = items.some((item) => item.status === "Ready");
+  if (els.copyBatchBrief) els.copyBatchBrief.disabled = !hasReady;
+  if (els.downloadBatchBrief) els.downloadBatchBrief.disabled = !hasReady;
+  if (els.downloadQualityReport) {
+    els.downloadQualityReport.disabled = !hasReady;
+  }
+  return items;
+}
+
+function normalizedPersonName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\b(candidate|profile|cv)\b/g, "")
+    .trim();
+}
+
+function reviewRoleMix(items) {
+  const counts = new Map();
+  for (const item of items.filter((entry) => entry.status === "Ready")) {
+    const key = item.roleCode || item.roleTitle || "Unassigned role";
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+function duplicateCandidateWarnings(items) {
+  const groups = new Map();
+  for (const item of items.filter((entry) => entry.status === "Ready")) {
+    const key = normalizedPersonName(item.candidateName);
+    if (!key) continue;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+  return [...groups.values()].filter((group) => group.length > 1);
+}
+
+function batchBriefText() {
+  const items = currentReviewQualityItems();
+  const stats = qualitySummaryStats(items);
+  const readyItems = items.filter((item) => item.status === "Ready");
+  const ranked = readyItems
+    .slice()
+    .sort((a, b) => b.quality.score - a.quality.score || candidateScore(b.profile || {}) - candidateScore(a.profile || {}))
+    .slice(0, 8);
+  const weak = items
+    .filter((item) => item.status !== "Ready" || item.quality.tone === "risk" || item.quality.issues.length >= 3)
+    .slice(0, 8);
+  const roleMix = reviewRoleMix(items);
+  const duplicates = duplicateCandidateWarnings(items);
+  const today = new Date().toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+
+  const lines = [
+    "ProfileForge Batch Intelligence Brief",
+    `Date: ${today}`,
+    "",
+    "Batch Summary",
+    `- PDFs reviewed: ${stats.total}`,
+    `- Profiles extracted: ${stats.extracted}`,
+    `- Batch quality: ${stats.average || 0}%`,
+    `- Ready: ${stats.ready}`,
+    `- Review: ${stats.review}`,
+    `- Needs work / failed: ${stats.risk + stats.failed}`,
+    "",
+    "Top Candidates",
+    ...(ranked.length
+      ? ranked.map((item, index) => `${index + 1}. ${item.candidateName || "Candidate"} - ${item.roleCode || item.roleTitle || "Role"} - quality ${item.quality.score}% - ${item.yearsOfExperience || "years to confirm"}`)
+      : ["- No ready profiles yet."]),
+    "",
+    "Role Mix",
+    ...(roleMix.length ? roleMix.map(([role, count]) => `- ${role}: ${count}`) : ["- No roles detected."]),
+    "",
+    "Review Focus",
+    ...(weak.length
+      ? weak.map((item, index) => `${index + 1}. ${item.candidateName || item.sourceName || "Profile"} - ${(item.quality.issues || []).map((issue) => issue.text).join("; ") || item.status}`)
+      : ["- No major review issues flagged."]),
+    "",
+    "Duplicate Name Warnings",
+    ...(duplicates.length
+      ? duplicates.map((group) => `- ${group[0].candidateName}: ${group.map((item) => item.sourceName).join(" | ")}`)
+      : ["- No duplicate candidate names detected."]),
+    "",
+    "Suggested Next Step",
+    stats.risk + stats.failed
+      ? "- Review the Needs work profiles first, then generate Excel and share the combined workbook."
+      : "- Generate Excel and share the combined workbook with confidence.",
+  ];
+
+  return lines.join("\n");
+}
+
+function reviewQualityReportCsv() {
+  const headers = ["Source PDF", "Candidate", "Role Code", "Role Title", "Years", "Quality Score", "Quality Status", "Checks To Review"];
+  const rows = currentReviewQualityItems().map((item) => [
+    item.sourceName,
+    item.candidateName,
+    item.roleCode,
+    item.roleTitle,
+    item.yearsOfExperience,
+    item.quality.score || "",
+    item.quality.label || item.status,
+    (item.quality.issues || []).map((issue) => issue.text).join("; "),
+  ]);
+  return [headers, ...rows]
+    .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+}
+
 function reviewSummaryText() {
   if (!state.reviewItems.length) return "No profiles ready";
-  const readyItems = state.reviewItems.filter((item) => item.status === "ready");
-  const failed = state.reviewItems.length - readyItems.length;
-  const qualities = readyItems.map((item) => profileQuality(item.profile));
-  const average = qualities.length ? Math.round(qualities.reduce((total, quality) => total + quality.score, 0) / qualities.length) : 0;
-  const flagged = qualities.filter((quality) => quality.issues.length).length;
-  const parts = [`${readyItems.length} profile${readyItems.length === 1 ? "" : "s"} ready`];
-  if (failed) parts.push(`${failed} failed`);
-  if (qualities.length) parts.push(`quality ${average}%`);
-  if (flagged) parts.push(`${flagged} to review`);
+  const stats = qualitySummaryStats();
+  const parts = [`${stats.extracted} profile${stats.extracted === 1 ? "" : "s"} ready`];
+  if (stats.failed) parts.push(`${stats.failed} failed`);
+  if (stats.extracted) parts.push(`quality ${stats.average}%`);
+  if (stats.flagged) parts.push(`${stats.flagged} to review`);
   return parts.join(", ");
 }
 
@@ -2309,16 +2488,11 @@ function refreshQualityGate(index) {
     field.classList.toggle("field-warning", flaggedFields.has(field.dataset.fieldId));
   });
 
-  const readyCards = state.reviewItems
-    .map((reviewItem, reviewIndex) => (reviewItem.status === "ready" ? profileQuality(reviewProfileFromCard(reviewItem, reviewIndex)) : null))
-    .filter(Boolean);
-  const failed = state.reviewItems.filter((reviewItem) => reviewItem.status !== "ready").length;
-  const average = readyCards.length ? Math.round(readyCards.reduce((total, qualityItem) => total + qualityItem.score, 0) / readyCards.length) : 0;
-  const flagged = readyCards.filter((qualityItem) => qualityItem.issues.length).length;
-  const parts = [`${readyCards.length} profile${readyCards.length === 1 ? "" : "s"} ready`];
-  if (failed) parts.push(`${failed} failed`);
-  if (readyCards.length) parts.push(`quality ${average}%`);
-  if (flagged) parts.push(`${flagged} to review`);
+  const stats = qualitySummaryStats(updateQualitySummary());
+  const parts = [`${stats.extracted} profile${stats.extracted === 1 ? "" : "s"} ready`];
+  if (stats.failed) parts.push(`${stats.failed} failed`);
+  if (stats.extracted) parts.push(`quality ${stats.average}%`);
+  if (stats.flagged) parts.push(`${stats.flagged} to review`);
   els.reviewSummary.textContent = parts.join(", ");
 }
 
@@ -2326,8 +2500,12 @@ function renderReviewPanel() {
   if (!state.reviewItems.length) {
     els.reviewPanel.hidden = true;
     els.reviewSummary.textContent = "No profiles ready";
+    if (els.qualitySummary) els.qualitySummary.innerHTML = "";
     els.reviewList.innerHTML = "";
     els.generateReviewed.disabled = true;
+    if (els.copyBatchBrief) els.copyBatchBrief.disabled = true;
+    if (els.downloadBatchBrief) els.downloadBatchBrief.disabled = true;
+    if (els.downloadQualityReport) els.downloadQualityReport.disabled = true;
     return;
   }
 
@@ -2335,6 +2513,7 @@ function renderReviewPanel() {
   els.reviewPanel.hidden = false;
   els.reviewSummary.textContent = reviewSummaryText();
   els.generateReviewed.disabled = ready === 0;
+  updateQualitySummary();
 
   els.reviewList.innerHTML = state.reviewItems
     .map((item, index) => {
@@ -2673,6 +2852,21 @@ els.generateReviewed.addEventListener("click", generateReviewedExcel);
 els.clearReview.addEventListener("click", () => {
   clearReviewQueue();
   showToast("Review queue cleared");
+});
+els.copyBatchBrief.addEventListener("click", async () => {
+  if (els.copyBatchBrief.disabled) return;
+  await copyText(batchBriefText());
+  showToast("Batch brief copied");
+});
+els.downloadBatchBrief.addEventListener("click", () => {
+  if (els.downloadBatchBrief.disabled) return;
+  downloadTextFile("profileforge-batch-brief.txt", batchBriefText(), "text/plain");
+  showToast("Batch brief downloaded");
+});
+els.downloadQualityReport.addEventListener("click", () => {
+  if (els.downloadQualityReport.disabled) return;
+  downloadTextFile("profileforge-quality-report.csv", reviewQualityReportCsv(), "text/csv");
+  showToast("Quality report downloaded");
 });
 els.reviewList.addEventListener("input", (event) => {
   const card = event.target.closest?.(".review-card[data-review-index]");

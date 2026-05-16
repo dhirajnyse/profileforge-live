@@ -52,6 +52,18 @@
         <svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-5"></path><path d="M20 12a8 8 0 1 1-3-6.2"></path></svg>
         Screening
       </a>
+      <a href="#boardroomPanel">
+        <svg viewBox="0 0 24 24"><path d="M4 19h16"></path><path d="M7 16V8"></path><path d="M12 16V5"></path><path d="M17 16v-6"></path><path d="M5 5h14"></path></svg>
+        Boardroom
+      </a>
+      <a href="#galaxyPanel">
+        <svg viewBox="0 0 24 24"><path d="M12 2v4"></path><path d="M12 18v4"></path><path d="M4.9 4.9l2.8 2.8"></path><path d="M16.3 16.3l2.8 2.8"></path><path d="M2 12h4"></path><path d="M18 12h4"></path><circle cx="12" cy="12" r="3"></circle><path d="M16.3 7.7l2.8-2.8"></path><path d="M4.9 19.1l2.8-2.8"></path></svg>
+        Galaxy
+      </a>
+      <a href="#portalPanel">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"></path><path d="M8 9h8"></path><path d="M8 13h5"></path><path d="M16 17l4 4"></path><path d="M20 17l-4 4"></path></svg>
+        Portal
+      </a>
       <a href="#launchDesk">
         <svg viewBox="0 0 24 24"><path d="M5 19c5-1 9-5 10-10l4-4"></path><path d="M14 5h5v5"></path><path d="M5 19l4-1"></path><path d="M5 19l1-4"></path></svg>
         Launch
@@ -112,6 +124,10 @@
         </article>
       </div>
       <div class="guide-actions">
+        <button type="button" class="secondary demo-button" id="loadDemo">
+          <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"></path><path d="M9 8h6"></path><path d="M9 12h6"></path><path d="M9 16h3"></path></svg>
+          Load demo
+        </button>
         <button type="button" class="secondary" id="copyAssistantGuide">
           <svg viewBox="0 0 24 24"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path></svg>
           Copy SOP
@@ -254,6 +270,23 @@
           <div class="progress-track">
             <div class="progress-fill" id="progressFill"></div>
           </div>
+        </div>
+
+        <div class="batch-receipt" id="batchReceipt" hidden>
+          <div>
+            <small>Batch receipt</small>
+            <h3 id="receiptTitle">Excel pack ready</h3>
+            <p id="receiptSummary">No batch completed yet</p>
+          </div>
+          <div class="receipt-metrics">
+            <span><b id="receiptCompleted">0</b>Ready</span>
+            <span><b id="receiptFailed">0</b>Needs review</span>
+            <span><b id="receiptOutput">-</b>Output</span>
+          </div>
+          <button type="button" class="secondary" id="copyReceipt">
+            <svg viewBox="0 0 24 24"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path></svg>
+            Copy receipt
+          </button>
         </div>
 
         <div class="launchpad" id="launchpad"></div>
@@ -479,6 +512,120 @@
       </div>
     </section>
 
+    <section class="boardroom-shell" id="boardroomPanel">
+      <div class="panel boardroom-panel">
+        <div class="panel-heading">
+          <h2>Client Boardroom</h2>
+          <div class="output-actions">
+            <button type="button" class="secondary" id="copyBoardroom">
+              <svg viewBox="0 0 24 24"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path></svg>
+              Memo
+            </button>
+            <button type="button" class="secondary" id="downloadBoardroom">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg>
+              HTML
+            </button>
+          </div>
+        </div>
+        <div class="boardroom-hero">
+          <div>
+            <span class="launch-kicker">Boardroom mode</span>
+            <h3>Turn a CV batch into a client-ready decision room</h3>
+            <p>ProfileForge ranks candidates, highlights skill signals, and prepares a submission memo from the same data used for Excel generation.</p>
+          </div>
+          <button type="button" class="secondary demo-button" id="boardroomDemo">
+            <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"></path><path d="M9 8h6"></path><path d="M9 12h6"></path><path d="M9 16h3"></path></svg>
+            Load boardroom demo
+          </button>
+        </div>
+        <div class="boardroom-content" id="boardroomContent">
+          <div class="empty-state">Load demo or convert CVs to build a client boardroom.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="galaxy-shell" id="galaxyPanel">
+      <div class="panel galaxy-panel">
+        <div class="panel-heading">
+          <h2>Talent Galaxy</h2>
+          <div class="output-actions">
+            <button type="button" class="secondary" id="copyGalaxy">
+              <svg viewBox="0 0 24 24"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path></svg>
+              Map
+            </button>
+            <button type="button" class="secondary" id="downloadGalaxy">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg>
+              SVG
+            </button>
+          </div>
+        </div>
+        <div class="galaxy-hero">
+          <div>
+            <span class="launch-kicker">Talent galaxy</span>
+            <h3>A living map of the candidate market</h3>
+            <p>Each profile becomes a glowing signal: score controls gravity, experience controls size, and status controls color so a client can see the shortlist instantly.</p>
+          </div>
+          <button type="button" class="secondary demo-button" id="galaxyDemo">
+            <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"></path><path d="M9 8h6"></path><path d="M9 12h6"></path><path d="M9 16h3"></path></svg>
+            Load galaxy demo
+          </button>
+        </div>
+        <div class="galaxy-content" id="galaxyContent">
+          <div class="empty-state">Load demo or convert CVs to reveal the Talent Galaxy.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="portal-shell" id="portalPanel">
+      <div class="panel portal-panel">
+        <div class="panel-heading">
+          <h2>Client Portal Studio</h2>
+          <div class="output-actions">
+            <button type="button" class="secondary" id="copyPortal">
+              <svg viewBox="0 0 24 24"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path></svg>
+              Invite
+            </button>
+            <button type="button" class="secondary" id="downloadPortal">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg>
+              Portal HTML
+            </button>
+          </div>
+        </div>
+        <div class="portal-hero">
+          <div>
+            <span class="launch-kicker">Client portal studio</span>
+            <h3>Turn every shortlist into a branded client room</h3>
+            <p>Generate a polished one-page portal from the same CV batch: client story, score cards, shortlist actions, and a self-contained HTML file ready for sharing.</p>
+          </div>
+          <button type="button" class="secondary demo-button" id="portalDemo">
+            <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"></path><path d="M9 8h6"></path><path d="M9 12h6"></path><path d="M9 16h3"></path></svg>
+            Load portal demo
+          </button>
+        </div>
+        <div class="portal-builder">
+          <label>
+            <span>Client name</span>
+            <input id="portalClientName" type="text" value="Client Shortlist Room" />
+          </label>
+          <label>
+            <span>Role or campaign</span>
+            <input id="portalRoleLabel" type="text" value="Priority candidate submission" />
+          </label>
+          <label>
+            <span>Portal tone</span>
+            <select id="portalTone">
+              <option value="boardroom">Boardroom</option>
+              <option value="energetic">Energetic</option>
+              <option value="executive">Executive</option>
+            </select>
+          </label>
+        </div>
+        <div class="portal-content" id="portalContent">
+          <div class="empty-state">Load demo or convert CVs to generate a client portal.</div>
+        </div>
+      </div>
+    </section>
+
     <section class="launch-shell" id="launchDesk">
       <div class="panel launch-panel">
         <div class="panel-heading">
@@ -581,6 +728,126 @@
       </div>
     </section>
 
+    <footer class="trust-footer" id="trustFooter">
+      <div class="trust-brand">
+        <span class="launch-kicker">Public beta</span>
+        <h2>ProfileForge is built for fast, private CV formatting work.</h2>
+        <p>Convert PDF CVs into client-ready Excel profiles directly in the browser, with quality review, combined workbooks, pipeline tracking, and launch-ready workflow tools.</p>
+      </div>
+      <div class="trust-grid">
+        <article>
+          <span class="trust-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.4 8.5-8 9-4.6-.5-8-4-8-9V7z"></path><path d="M9 12l2 2 4-5"></path></svg>
+          </span>
+          <strong>Privacy-first</strong>
+          <p>PDF processing runs in the visitor's browser. The static GitHub Pages version does not upload CV files to a server.</p>
+        </article>
+        <article>
+          <span class="trust-icon">
+            <svg viewBox="0 0 24 24"><path d="M4 4h16v13H7l-3 3z"></path><path d="M8 9h8"></path><path d="M8 13h5"></path></svg>
+          </span>
+          <strong>Support-ready</strong>
+          <p>Connect a domain email later, then use the copied product brief and SOP for client or office onboarding.</p>
+        </article>
+        <article>
+          <span class="trust-icon">
+            <svg viewBox="0 0 24 24"><path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h10"></path><path d="M18 15l2 2-2 2"></path></svg>
+          </span>
+          <strong>Office workflow</strong>
+          <p>Built for repeat batches: reorder PDFs, review fields, export individual files, and deliver one combined workbook.</p>
+        </article>
+      </div>
+      <div class="trust-actions">
+        <button type="button" class="secondary" id="copyProductBrief">
+          <svg viewBox="0 0 24 24"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path></svg>
+          Product brief
+        </button>
+        <button type="button" class="secondary" id="copyPrivacyNote">
+          <svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.4 8.5-8 9-4.6-.5-8-4-8-9V7z"></path><path d="M9 12l2 2 4-5"></path></svg>
+          Privacy note
+        </button>
+      </div>
+    </footer>
+
+    <button type="button" class="command-fab" id="openCommand" aria-label="Open Command Deck">
+      <svg viewBox="0 0 24 24"><path d="M4 5h16"></path><path d="M4 12h10"></path><path d="M4 19h16"></path><path d="M18 10l2 2-2 2"></path></svg>
+      Command
+    </button>
+
+    <div class="command-dock" id="commandDock" hidden>
+      <div class="command-panel" role="dialog" aria-modal="true" aria-labelledby="commandTitle">
+        <div class="command-head">
+          <div>
+            <span class="launch-kicker">Command Deck</span>
+            <h2 id="commandTitle">Run ProfileForge from one place</h2>
+            <p>Search actions, jump across the workspace, copy launch assets, or load a demo batch instantly.</p>
+          </div>
+          <button type="button" class="secondary subtle command-close" id="closeCommand" aria-label="Close Command Deck">
+            <svg viewBox="0 0 24 24"><path d="M18 6L6 18"></path><path d="M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <label class="command-search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+          <input id="commandSearch" type="text" autocomplete="off" placeholder="Try demo, portal, galaxy, pricing, privacy..." />
+        </label>
+        <div class="command-actions" id="commandActions">
+          <button type="button" data-command="demo" data-keywords="demo sample preview live batch">
+            <strong>Load Demo Batch</strong>
+            <span>Populate results, pipeline, receipt, and screening.</span>
+          </button>
+          <button type="button" data-command="start" data-keywords="start upload converter pdf cv files">
+            <strong>Start New Batch</strong>
+            <span>Jump to the PDF upload area.</span>
+          </button>
+          <button type="button" data-command="receipt" data-keywords="receipt report copy batch summary">
+            <strong>Copy Batch Receipt</strong>
+            <span>Share what was produced after conversion.</span>
+          </button>
+          <button type="button" data-command="sop" data-keywords="sop assistant guide office instructions">
+            <strong>Copy Assistant SOP</strong>
+            <span>Give staff the operating steps.</span>
+          </button>
+          <button type="button" data-command="screening" data-keywords="screening match compare candidates role">
+            <strong>Open Screening Lab</strong>
+            <span>Jump to candidate matching tools.</span>
+          </button>
+          <button type="button" data-command="boardroom" data-keywords="boardroom client memo html report submission">
+            <strong>Open Boardroom</strong>
+            <span>View client-ready shortlist intelligence.</span>
+          </button>
+          <button type="button" data-command="galaxy" data-keywords="galaxy visual map constellation candidate shortlist svg">
+            <strong>Open Talent Galaxy</strong>
+            <span>Show the candidate universe and export a visual map.</span>
+          </button>
+          <button type="button" data-command="portal" data-keywords="portal client room share html shortlist submission">
+            <strong>Open Client Portal</strong>
+            <span>Build a client-facing shortlist page.</span>
+          </button>
+          <button type="button" data-command="pipeline" data-keywords="pipeline shortlist candidates workflow">
+            <strong>Open Pipeline</strong>
+            <span>Review candidate status and next steps.</span>
+          </button>
+          <button type="button" data-command="pricing" data-keywords="pricing membership plans revenue">
+            <strong>Copy Pricing</strong>
+            <span>Copy founding membership structure.</span>
+          </button>
+          <button type="button" data-command="privacy" data-keywords="privacy security browser local note">
+            <strong>Copy Privacy Note</strong>
+            <span>Explain browser-only CV processing.</span>
+          </button>
+          <button type="button" data-command="brief" data-keywords="product brief pitch launch public">
+            <strong>Copy Product Brief</strong>
+            <span>Share the launch-ready product summary.</span>
+          </button>
+          <button type="button" data-command="launch" data-keywords="launch desk domain checklist">
+            <strong>Open Launch Desk</strong>
+            <span>Jump to pricing and domain-readiness tools.</span>
+          </button>
+        </div>
+        <div class="command-empty" id="commandEmpty" hidden>No matching command</div>
+      </div>
+    </div>
+
     <button
       type="button"
       class="back-to-top show is-resting"
@@ -593,6 +860,6 @@
     </button>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=20260516-assistant-handoff"></script>
+    <script src="./app.js?v=20260516-client-portal"></script>
   </body>
 </html>

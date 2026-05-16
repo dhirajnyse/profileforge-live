@@ -25,6 +25,60 @@ const FIELD_FALLBACKS = {
   projectsHandled: "Project details to be confirmed during screening.",
 };
 
+const DEMO_RECORDS = [
+  {
+    sourceName: "DEMO-ROLE-001 - Senior - Aisha Khan.pdf",
+    profile: {
+      roleCode: "DEMO-ROLE-001",
+      roleTitle: "Senior Data Analyst",
+      candidateName: "Aisha Khan",
+      yearsOfExperience: "9+ years",
+      relevantExperience:
+        "Senior analytics professional with strong Power BI, SQL, stakeholder reporting, dashboard governance, and client-facing delivery experience across finance and operations teams.",
+      keySkills: "Power BI, SQL, Excel automation, stakeholder dashboards, data modelling, KPI reporting, client communication",
+      certifications: "Microsoft Power BI Data Analyst, Advanced SQL, Data Visualization Certificate",
+      educationalQualifications: "Bachelor's degree in Computer Science with analytics specialization",
+      previousEmployer: "Nexora Analytics, Gulf Retail Group",
+      projectsHandled: "Executive KPI suite, monthly sales intelligence pack, automated finance reporting dashboard, client performance review dashboards",
+      note: PROFILE_NOTE,
+    },
+  },
+  {
+    sourceName: "DEMO-ROLE-002 - Intermediate - Omar Rahman.pdf",
+    profile: {
+      roleCode: "DEMO-ROLE-002",
+      roleTitle: "AI Automation Specialist",
+      candidateName: "Omar Rahman",
+      yearsOfExperience: "6+ years",
+      relevantExperience:
+        "Automation specialist with Python, API workflow design, document processing, prompt-based review flows, and operational reporting experience for recruitment and service teams.",
+      keySkills: "Python, AI workflow automation, APIs, document processing, SQL, Excel, operations dashboards, process improvement",
+      certifications: "Python Automation, API Fundamentals, Data Analytics Professional Certificate",
+      educationalQualifications: "Bachelor's degree in Information Systems",
+      previousEmployer: "TaskFlow Labs, Meridian Services",
+      projectsHandled: "CV processing workflow, service ticket automation, API reporting connector, Excel-based operations tracker",
+      note: PROFILE_NOTE,
+    },
+  },
+  {
+    sourceName: "DEMO-ROLE-003 - Junior - Lina Costa.pdf",
+    profile: {
+      roleCode: "DEMO-ROLE-003",
+      roleTitle: "BI Reporting Associate",
+      candidateName: "Lina Costa",
+      yearsOfExperience: "3+ years",
+      relevantExperience:
+        "Reporting associate experienced in Excel reporting, Power BI dashboard maintenance, data quality checks, and weekly management packs for sales and customer-success teams.",
+      keySkills: "Excel, Power BI, data cleaning, dashboard maintenance, reporting packs, SQL basics, documentation",
+      certifications: "Excel Advanced, Power BI Essentials",
+      educationalQualifications: "Bachelor's degree in Business Analytics",
+      previousEmployer: "BrightMetrics, Horizon Customer Solutions",
+      projectsHandled: "Weekly sales tracker, customer churn dashboard, data quality checklist, management reporting pack",
+      note: PROFILE_NOTE,
+    },
+  },
+];
+
 const DEFAULT_TEMPLATE_MAPPING = PROFILE_FIELDS.reduce((mapping, field) => {
   mapping[field.id] = field.defaultCell;
   return mapping;
@@ -39,6 +93,8 @@ const state = {
   pipeline: [],
   taskPlan: [],
   matchResults: [],
+  batchReceipt: null,
+  galaxyFocusId: null,
 };
 
 const els = {
@@ -69,6 +125,13 @@ const els = {
   jobStatus: document.querySelector("#jobStatus"),
   jobCounts: document.querySelector("#jobCounts"),
   progressFill: document.querySelector("#progressFill"),
+  batchReceipt: document.querySelector("#batchReceipt"),
+  receiptTitle: document.querySelector("#receiptTitle"),
+  receiptSummary: document.querySelector("#receiptSummary"),
+  receiptCompleted: document.querySelector("#receiptCompleted"),
+  receiptFailed: document.querySelector("#receiptFailed"),
+  receiptOutput: document.querySelector("#receiptOutput"),
+  copyReceipt: document.querySelector("#copyReceipt"),
   launchpad: document.querySelector("#launchpad"),
   reviewPanel: document.querySelector("#reviewPanel"),
   reviewSummary: document.querySelector("#reviewSummary"),
@@ -101,14 +164,38 @@ const els = {
   comparisonBody: document.querySelector("#comparisonBody"),
   copyMatches: document.querySelector("#copyMatches"),
   exportMatches: document.querySelector("#exportMatches"),
+  boardroomContent: document.querySelector("#boardroomContent"),
+  copyBoardroom: document.querySelector("#copyBoardroom"),
+  downloadBoardroom: document.querySelector("#downloadBoardroom"),
+  boardroomDemo: document.querySelector("#boardroomDemo"),
+  galaxyContent: document.querySelector("#galaxyContent"),
+  copyGalaxy: document.querySelector("#copyGalaxy"),
+  downloadGalaxy: document.querySelector("#downloadGalaxy"),
+  galaxyDemo: document.querySelector("#galaxyDemo"),
+  portalContent: document.querySelector("#portalContent"),
+  portalClientName: document.querySelector("#portalClientName"),
+  portalRoleLabel: document.querySelector("#portalRoleLabel"),
+  portalTone: document.querySelector("#portalTone"),
+  copyPortal: document.querySelector("#copyPortal"),
+  downloadPortal: document.querySelector("#downloadPortal"),
+  portalDemo: document.querySelector("#portalDemo"),
+  loadDemo: document.querySelector("#loadDemo"),
   copyAssistantGuide: document.querySelector("#copyAssistantGuide"),
   copyPricing: document.querySelector("#copyPricing"),
   copyLaunchChecklist: document.querySelector("#copyLaunchChecklist"),
+  copyProductBrief: document.querySelector("#copyProductBrief"),
+  copyPrivacyNote: document.querySelector("#copyPrivacyNote"),
   starterMembers: document.querySelector("#starterMembers"),
   proMembers: document.querySelector("#proMembers"),
   studioMembers: document.querySelector("#studioMembers"),
   launchMrr: document.querySelector("#launchMrr"),
   launchArr: document.querySelector("#launchArr"),
+  openCommand: document.querySelector("#openCommand"),
+  commandDock: document.querySelector("#commandDock"),
+  closeCommand: document.querySelector("#closeCommand"),
+  commandSearch: document.querySelector("#commandSearch"),
+  commandActions: document.querySelector("#commandActions"),
+  commandEmpty: document.querySelector("#commandEmpty"),
   backToTop: document.querySelector("#backToTop"),
   toast: document.querySelector("#toast"),
 };
@@ -155,6 +242,747 @@ function setProgress(message, completed, total) {
   els.jobStatus.textContent = message;
   els.jobCounts.textContent = `${completed} / ${total}`;
   els.progressFill.style.width = `${percent}%`;
+}
+
+function receiptOutputLabel() {
+  if (els.singleSheetWorkbook.checked) return `One sheet ${selectedStackDirection()}`;
+  if (els.combinedWorkbook.checked) return "Combined";
+  return "Individual";
+}
+
+function renderBatchReceipt(receipt = null) {
+  state.batchReceipt = receipt;
+  if (!els.batchReceipt) return;
+  if (!receipt) {
+    els.batchReceipt.hidden = true;
+    return;
+  }
+
+  els.batchReceipt.hidden = false;
+  els.receiptTitle.textContent = receipt.title || "Excel pack ready";
+  els.receiptSummary.textContent = receipt.summary || "";
+  els.receiptCompleted.textContent = String(receipt.completed || 0);
+  els.receiptFailed.textContent = String(receipt.failed || 0);
+  els.receiptOutput.textContent = receipt.output || "-";
+}
+
+function batchReceiptText() {
+  const receipt = state.batchReceipt;
+  if (!receipt) return "No batch receipt yet.";
+  const lines = [
+    "ProfileForge Batch Receipt",
+    `Status: ${receipt.title || "Excel pack ready"}`,
+    `Completed profiles: ${receipt.completed || 0}/${receipt.total || 0}`,
+    `Needs review: ${receipt.failed || 0}`,
+    `Output: ${receipt.output || "-"}`,
+    `Batch: ${receipt.source || "CV batch"}`,
+  ];
+  if (receipt.files?.length) {
+    lines.push("", "Files:");
+    receipt.files.forEach((fileName, index) => lines.push(`${index + 1}. ${fileName}`));
+  }
+  return lines.join("\n");
+}
+
+function scrollToSection(selector) {
+  document.querySelector(selector)?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+}
+
+function boardroomCandidates() {
+  return state.pipeline.slice().sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0));
+}
+
+function boardroomSkillSignals(limit = 12) {
+  const counts = new Map();
+  state.pipeline.forEach((item) => {
+    extractKeywords(`${item.keySkills || ""} ${item.relevantExperience || ""}`)
+      .slice(0, 14)
+      .forEach((keyword) => counts.set(keyword, (counts.get(keyword) || 0) + 1));
+  });
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([keyword, count]) => ({ keyword, count }));
+}
+
+function boardroomStats() {
+  const candidates = boardroomCandidates();
+  const total = candidates.length;
+  const shortlist = candidates.filter((item) => ["Shortlist", "Interview", "Submitted"].includes(item.status)).length;
+  const average = total ? Math.round(candidates.reduce((sum, item) => sum + (Number(item.score) || 0), 0) / total) : 0;
+  const senior = candidates.filter((item) => parseYearsNumber(item.yearsOfExperience) >= 7).length;
+  return { total, shortlist, average, senior };
+}
+
+function boardroomMemoText() {
+  const candidates = boardroomCandidates();
+  if (!candidates.length) return "No candidates available for Boardroom Mode yet.";
+  const stats = boardroomStats();
+  const top = candidates.slice(0, 5);
+  const skills = boardroomSkillSignals(8).map((item) => item.keyword).join(", ") || "role-specific skills";
+  return [
+    "ProfileForge Client Boardroom Memo",
+    "",
+    `Profiles reviewed: ${stats.total}`,
+    `Shortlist-ready: ${stats.shortlist}`,
+    `Average profile score: ${stats.average}`,
+    `Senior profiles: ${stats.senior}`,
+    `Skill signals: ${skills}`,
+    "",
+    "Recommended shortlist:",
+    ...top.map((item, index) => `${index + 1}. ${item.candidateName} - ${item.roleCode || item.roleTitle || "Role"} - ${item.yearsOfExperience || "Experience pending"} - score ${item.score}`),
+    "",
+    "Recommended next step: validate final CV details, confirm role fit, and prepare the combined Excel profile workbook for submission.",
+  ].join("\n");
+}
+
+function boardroomReportHtml() {
+  const candidates = boardroomCandidates();
+  const stats = boardroomStats();
+  const skills = boardroomSkillSignals(12);
+  const rows = candidates
+    .map(
+      (item) => `
+        <tr>
+          <td>${escapeHtml(item.candidateName)}</td>
+          <td>${escapeHtml([item.roleCode, item.roleTitle].filter(Boolean).join(" - "))}</td>
+          <td>${escapeHtml(item.yearsOfExperience || "")}</td>
+          <td>${escapeHtml(item.status || "Review")}</td>
+          <td>${escapeHtml(item.score || 0)}</td>
+        </tr>
+      `,
+    )
+    .join("");
+  const skillHtml = skills.map((item) => `<span>${escapeHtml(item.keyword)} (${item.count})</span>`).join("");
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProfileForge Client Boardroom</title>
+<style>
+body{font-family:Segoe UI,Arial,sans-serif;margin:0;padding:32px;background:#f5f7fb;color:#17202a}
+.wrap{max-width:1080px;margin:auto;background:#fff;border:1px solid #d7e0eb;border-radius:10px;padding:26px;box-shadow:0 20px 45px rgba(23,32,42,.08)}
+h1{margin:0 0 8px;font-size:30px}.muted{color:#5c6876}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}
+.stat{padding:14px;border:1px solid #d7e0eb;border-radius:8px;background:#f8fbfd}.stat b{display:block;font-size:28px}
+.skills{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 22px}.skills span{padding:6px 10px;border-radius:999px;background:#edf6ff;color:#214f8f;font-weight:700;font-size:13px}
+table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #e3e9f0;text-align:left}th{background:#214f8f;color:white}
+</style>
+</head>
+<body>
+<main class="wrap">
+<h1>ProfileForge Client Boardroom</h1>
+<p class="muted">Client-ready candidate intelligence generated from the current CV batch.</p>
+<section class="stats">
+<div class="stat"><b>${stats.total}</b>Profiles</div>
+<div class="stat"><b>${stats.shortlist}</b>Shortlist-ready</div>
+<div class="stat"><b>${stats.average}</b>Average score</div>
+<div class="stat"><b>${stats.senior}</b>Senior profiles</div>
+</section>
+<h2>Skill Signals</h2>
+<div class="skills">${skillHtml || "<span>Awaiting profile data</span>"}</div>
+<h2>Candidate Board</h2>
+<table><thead><tr><th>Candidate</th><th>Role</th><th>Years</th><th>Status</th><th>Score</th></tr></thead><tbody>${rows}</tbody></table>
+</main>
+</body>
+</html>`;
+}
+
+function renderBoardroom() {
+  if (!els.boardroomContent) return;
+  const candidates = boardroomCandidates();
+  if (!candidates.length) {
+    els.boardroomContent.innerHTML = '<div class="empty-state">Load demo or convert CVs to build a client boardroom.</div>';
+    if (els.copyBoardroom) els.copyBoardroom.disabled = true;
+    if (els.downloadBoardroom) els.downloadBoardroom.disabled = true;
+    return;
+  }
+
+  if (els.copyBoardroom) els.copyBoardroom.disabled = false;
+  if (els.downloadBoardroom) els.downloadBoardroom.disabled = false;
+  const stats = boardroomStats();
+  const top = candidates.slice(0, 3);
+  const skills = boardroomSkillSignals(12);
+  const topCandidate = top[0];
+  els.boardroomContent.innerHTML = `
+    <div class="boardroom-stats">
+      <article><span>Profiles</span><strong>${stats.total}</strong></article>
+      <article><span>Shortlist-ready</span><strong>${stats.shortlist}</strong></article>
+      <article><span>Average score</span><strong>${stats.average}</strong></article>
+      <article><span>Senior profiles</span><strong>${stats.senior}</strong></article>
+    </div>
+    <div class="boardroom-grid">
+      <section class="boardroom-spotlight">
+        <small>Recommended lead</small>
+        <h3>${escapeHtml(topCandidate.candidateName)}</h3>
+        <p>${escapeHtml([topCandidate.roleCode, topCandidate.roleTitle].filter(Boolean).join(" - ") || "Role pending")}</p>
+        <div class="boardroom-score">${escapeHtml(topCandidate.score)}<span>score</span></div>
+      </section>
+      <section class="boardroom-podium">
+        ${top
+          .map(
+            (item, index) => `
+              <article>
+                <b>${index + 1}</b>
+                <strong>${escapeHtml(item.candidateName)}</strong>
+                <span>${escapeHtml(item.yearsOfExperience || "Experience pending")}</span>
+                <small>${escapeHtml(item.status || "Review")} - ${escapeHtml(item.score || 0)}</small>
+              </article>
+            `,
+          )
+          .join("")}
+      </section>
+    </div>
+    <section class="skill-heatmap">
+      <div class="section-title">
+        <h3>Skill Heatmap</h3>
+        <span>${skills.length} signals</span>
+      </div>
+      <div class="heatmap-list">
+        ${skills
+          .map((item) => `<span style="--signal:${Math.min(1, item.count / Math.max(1, stats.total))}">${escapeHtml(item.keyword)} <b>${item.count}</b></span>`)
+          .join("")}
+      </div>
+    </section>
+    <section class="boardroom-memo">
+      <div class="section-title">
+        <h3>Client Memo Preview</h3>
+        <span>Copy or download HTML</span>
+      </div>
+      <pre>${escapeHtml(boardroomMemoText())}</pre>
+    </section>
+  `;
+}
+
+function candidateInitials(name) {
+  const words = String(name || "Candidate")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  const initials = words.slice(0, 2).map((word) => word[0]).join("").toUpperCase();
+  return initials || "CV";
+}
+
+function galaxyCandidates() {
+  return boardroomCandidates();
+}
+
+function galaxyStatusKey(status) {
+  const text = String(status || "Review").toLowerCase();
+  if (text.includes("submitted")) return "submitted";
+  if (text.includes("interview")) return "interview";
+  if (text.includes("shortlist")) return "shortlist";
+  if (text.includes("hold")) return "hold";
+  if (text.includes("reject")) return "rejected";
+  return "review";
+}
+
+function galaxyStatusColor(status) {
+  return (
+    {
+      shortlist: "#24be86",
+      interview: "#00a6d6",
+      submitted: "#8c3ed9",
+      hold: "#f1a416",
+      rejected: "#be3d39",
+      review: "#214f8f",
+    }[galaxyStatusKey(status)] || "#214f8f"
+  );
+}
+
+function galaxyPoint(item, index, total) {
+  const score = Math.max(42, Math.min(99, Number(item.score) || 42));
+  const years = Math.max(0, Math.min(18, parseYearsNumber(item.yearsOfExperience)));
+  const spread = total > 1 ? index / Math.max(1, total - 1) : 0;
+  const angle = ((index * 137.508 + score * 2.4) % 360) * (Math.PI / 180);
+  const scoreGravity = (99 - score) / 57;
+  const radius = Math.min(43, 8 + scoreGravity * 22 + spread * 22);
+  const x = Math.max(8, Math.min(92, 50 + Math.cos(angle) * radius));
+  const y = Math.max(12, Math.min(88, 50 + Math.sin(angle) * radius * 0.72));
+  const size = Math.round(42 + Math.min(18, years * 1.2) + Math.max(0, score - 60) * 0.36);
+  return { x, y, size, score };
+}
+
+function galaxyStats() {
+  const candidates = galaxyCandidates();
+  const statusMix = candidates.reduce((mix, item) => {
+    const key = galaxyStatusKey(item.status);
+    mix[key] = (mix[key] || 0) + 1;
+    return mix;
+  }, {});
+  const roleFamilies = new Set(
+    candidates
+      .map((item) => String(item.roleCode || item.roleTitle || "").split("-").slice(0, 2).join("-").trim())
+      .filter(Boolean),
+  );
+  const topScore = candidates.length ? Math.max(...candidates.map((item) => Number(item.score) || 0)) : 0;
+  const hotSkill = boardroomSkillSignals(1)[0]?.keyword || "profile intelligence";
+  return {
+    total: candidates.length,
+    topScore,
+    ready: (statusMix.shortlist || 0) + (statusMix.interview || 0) + (statusMix.submitted || 0),
+    roleFamilies: roleFamilies.size,
+    hotSkill,
+    statusMix,
+  };
+}
+
+function galaxyMemoText() {
+  const candidates = galaxyCandidates();
+  if (!candidates.length) return "No candidates available for Talent Galaxy yet.";
+  const stats = galaxyStats();
+  const top = candidates.slice(0, 7);
+  const statusLine = Object.entries(stats.statusMix)
+    .map(([status, count]) => `${status}: ${count}`)
+    .join(", ");
+  return [
+    "ProfileForge Talent Galaxy",
+    "",
+    `Candidates mapped: ${stats.total}`,
+    `Submission-ready signals: ${stats.ready}`,
+    `Top score: ${stats.topScore}`,
+    `Role families: ${stats.roleFamilies}`,
+    `Dominant skill signal: ${stats.hotSkill}`,
+    `Status orbit: ${statusLine || "Awaiting profile data"}`,
+    "",
+    "Constellation shortlist:",
+    ...top.map((item, index) => {
+      const role = [item.roleCode, item.roleTitle].filter(Boolean).join(" - ") || "Role pending";
+      return `${index + 1}. ${item.candidateName} | ${role} | ${item.yearsOfExperience || "Experience pending"} | ${item.status || "Review"} | ${item.score}`;
+    }),
+    "",
+    "Recommended use: open this visual during client calls, lead with the core orbit, and keep lower-score profiles in reserve for calibration.",
+  ].join("\n");
+}
+
+function galaxySvg() {
+  const candidates = galaxyCandidates();
+  const stats = galaxyStats();
+  const width = 1280;
+  const height = 760;
+  const nodes = candidates
+    .map((item, index) => {
+      const point = galaxyPoint(item, index, candidates.length);
+      const cx = Math.round(120 + (point.x / 100) * 1040);
+      const cy = Math.round(110 + (point.y / 100) * 500);
+      const radius = Math.round(point.size / 2.35);
+      const color = galaxyStatusColor(item.status);
+      return `
+        <g>
+          <circle cx="${cx}" cy="${cy}" r="${radius + 8}" fill="${color}" opacity="0.12"/>
+          <circle cx="${cx}" cy="${cy}" r="${radius}" fill="${color}" opacity="0.92"/>
+          <text x="${cx}" y="${cy - 2}" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-size="17" font-weight="800">${xmlEscape(candidateInitials(item.candidateName))}</text>
+          <text x="${cx}" y="${cy + radius + 20}" text-anchor="middle" fill="#17202a" font-size="13" font-weight="700">${xmlEscape(trimToWords(item.candidateName, 22))}</text>
+          <text x="${cx}" y="${cy + radius + 38}" text-anchor="middle" fill="#5c6876" font-size="12">${xmlEscape(item.score || 0)} score</text>
+        </g>
+      `;
+    })
+    .join("");
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#edf6ff"/>
+      <stop offset="48%" stop-color="#fff0f7"/>
+      <stop offset="100%" stop-color="#edfff7"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#214f8f" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="760" rx="28" fill="url(#bg)"/>
+  <g filter="url(#softShadow)">
+    <rect x="48" y="42" width="1184" height="676" rx="24" fill="#ffffff" opacity="0.9"/>
+  </g>
+  <text x="84" y="100" fill="#17202a" font-size="34" font-weight="900">ProfileForge Talent Galaxy</text>
+  <text x="84" y="132" fill="#5c6876" font-size="16">Client-ready visual map generated from the current CV batch</text>
+  <g fill="none" stroke="#cfd7e2" stroke-width="2" opacity="0.72">
+    <ellipse cx="640" cy="360" rx="138" ry="84"/>
+    <ellipse cx="640" cy="360" rx="274" ry="166"/>
+    <ellipse cx="640" cy="360" rx="420" ry="252"/>
+  </g>
+  <text x="640" y="355" text-anchor="middle" fill="#214f8f" font-size="19" font-weight="900">Shortlist Core</text>
+  <text x="640" y="382" text-anchor="middle" fill="#5c6876" font-size="13">${xmlEscape(stats.total)} profiles | ${xmlEscape(stats.ready)} ready | top score ${xmlEscape(stats.topScore)}</text>
+  ${nodes}
+</svg>`;
+}
+
+function renderGalaxy() {
+  if (!els.galaxyContent) return;
+  const candidates = galaxyCandidates();
+  if (!candidates.length) {
+    state.galaxyFocusId = null;
+    els.galaxyContent.innerHTML = '<div class="empty-state">Load demo or convert CVs to reveal the Talent Galaxy.</div>';
+    if (els.copyGalaxy) els.copyGalaxy.disabled = true;
+    if (els.downloadGalaxy) els.downloadGalaxy.disabled = true;
+    return;
+  }
+
+  if (els.copyGalaxy) els.copyGalaxy.disabled = false;
+  if (els.downloadGalaxy) els.downloadGalaxy.disabled = false;
+  if (!candidates.some((item) => item.id === state.galaxyFocusId)) {
+    state.galaxyFocusId = candidates[0].id;
+  }
+  const focus = candidates.find((item) => item.id === state.galaxyFocusId) || candidates[0];
+  const stats = galaxyStats();
+  const skills = boardroomSkillSignals(9);
+  const nodes = candidates
+    .map((item, index) => {
+      const point = galaxyPoint(item, index, candidates.length);
+      const selected = item.id === focus.id ? " selected" : "";
+      const status = galaxyStatusKey(item.status);
+      return `
+        <button
+          type="button"
+          class="galaxy-node galaxy-status-${status}${selected}"
+          data-id="${escapeHtml(item.id)}"
+          style="--x:${point.x.toFixed(2)}%; --y:${point.y.toFixed(2)}%; --size:${point.size}px; --delay:${Math.min(600, index * 45)}ms;"
+          title="${escapeHtml(`${item.candidateName} - ${item.score} score`)}"
+        >
+          <span>${escapeHtml(candidateInitials(item.candidateName))}</span>
+          <small>${escapeHtml(item.score || 0)}</small>
+        </button>
+      `;
+    })
+    .join("");
+
+  els.galaxyContent.innerHTML = `
+    <div class="galaxy-dashboard">
+      <section class="galaxy-map" aria-label="Candidate visual map">
+        <div class="galaxy-ring ring-core"></div>
+        <div class="galaxy-ring ring-mid"></div>
+        <div class="galaxy-ring ring-edge"></div>
+        <div class="galaxy-core">
+          <strong>Shortlist Core</strong>
+          <span>${stats.ready} ready</span>
+        </div>
+        ${nodes}
+      </section>
+      <aside class="galaxy-focus-card">
+        <span class="launch-kicker">Focus signal</span>
+        <h3>${escapeHtml(focus.candidateName)}</h3>
+        <p>${escapeHtml([focus.roleCode, focus.roleTitle].filter(Boolean).join(" - ") || "Role pending")}</p>
+        <div class="galaxy-focus-score">
+          <strong>${escapeHtml(focus.score || 0)}</strong>
+          <span>${escapeHtml(focus.status || "Review")}</span>
+        </div>
+        <dl>
+          <div><dt>Experience</dt><dd>${escapeHtml(focus.yearsOfExperience || "To confirm")}</dd></div>
+          <div><dt>Next step</dt><dd>${escapeHtml(focus.nextStep || "Verify CV details")}</dd></div>
+          <div><dt>File</dt><dd>${escapeHtml(trimToWords(focus.sourceName || "Source CV", 38))}</dd></div>
+        </dl>
+      </aside>
+    </div>
+    <div class="galaxy-insights">
+      <article><span>Total signals</span><strong>${stats.total}</strong></article>
+      <article><span>Ready orbit</span><strong>${stats.ready}</strong></article>
+      <article><span>Top score</span><strong>${stats.topScore}</strong></article>
+      <article><span>Role families</span><strong>${stats.roleFamilies}</strong></article>
+    </div>
+    <section class="galaxy-bottom-grid">
+      <div class="galaxy-skill-strip">
+        <div class="section-title">
+          <h3>Hot Skill Nebula</h3>
+          <span>${escapeHtml(stats.hotSkill)}</span>
+        </div>
+        <div class="galaxy-tags">
+          ${skills.map((item) => `<span>${escapeHtml(item.keyword)} <b>${item.count}</b></span>`).join("")}
+        </div>
+      </div>
+      <div class="galaxy-flight-board">
+        <div class="section-title">
+          <h3>Flight Board</h3>
+          <span>Ranked by score</span>
+        </div>
+        ${candidates
+          .slice(0, 8)
+          .map(
+            (item, index) => `
+              <button type="button" data-id="${escapeHtml(item.id)}">
+                <b>${index + 1}</b>
+                <span>${escapeHtml(item.candidateName)}</span>
+                <small>${escapeHtml(item.status || "Review")} - ${escapeHtml(item.score || 0)}</small>
+              </button>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function portalMeta() {
+  return {
+    clientName: String(els.portalClientName?.value || "Client Shortlist Room").trim() || "Client Shortlist Room",
+    roleLabel: String(els.portalRoleLabel?.value || "Priority candidate submission").trim() || "Priority candidate submission",
+    tone: String(els.portalTone?.value || "boardroom"),
+  };
+}
+
+function portalCandidates() {
+  const active = boardroomCandidates().filter((item) => !["Rejected", "Hold"].includes(item.status));
+  return active.length ? active : boardroomCandidates();
+}
+
+function portalStats() {
+  const candidates = portalCandidates();
+  const total = candidates.length;
+  const ready = candidates.filter((item) => ["Shortlist", "Interview", "Submitted"].includes(item.status)).length;
+  const average = total ? Math.round(candidates.reduce((sum, item) => sum + (Number(item.score) || 0), 0) / total) : 0;
+  const senior = candidates.filter((item) => parseYearsNumber(item.yearsOfExperience) >= 7).length;
+  const strongestSkill = boardroomSkillSignals(1)[0]?.keyword || "role fit";
+  return { total, ready, average, senior, strongestSkill };
+}
+
+function portalInviteText() {
+  const candidates = portalCandidates();
+  if (!candidates.length) return "No portal is available yet. Load demo or convert CVs first.";
+  const meta = portalMeta();
+  const stats = portalStats();
+  const lead = candidates[0];
+  return [
+    `ProfileForge Client Portal - ${meta.clientName}`,
+    "",
+    `Campaign: ${meta.roleLabel}`,
+    `Profiles included: ${stats.total}`,
+    `Submission-ready: ${stats.ready}`,
+    `Average score: ${stats.average}`,
+    `Strongest skill signal: ${stats.strongestSkill}`,
+    "",
+    `Recommended lead candidate: ${lead.candidateName} (${lead.score} score)`,
+    "",
+    "Open the attached portal HTML to review the shortlist, candidate cards, skill signals, and next-step recommendations.",
+  ].join("\n");
+}
+
+function portalHtml() {
+  const meta = portalMeta();
+  const stats = portalStats();
+  const candidates = portalCandidates();
+  const skills = boardroomSkillSignals(10);
+  const toneLabel =
+    {
+      boardroom: "Boardroom-ready shortlist",
+      energetic: "Fast-moving talent launch",
+      executive: "Executive submission room",
+    }[meta.tone] || "Boardroom-ready shortlist";
+  const cards = candidates
+    .slice(0, 12)
+    .map(
+      (item, index) => `
+        <article class="candidate">
+          <div class="rank">${index + 1}</div>
+          <div>
+            <h3>${escapeHtml(item.candidateName)}</h3>
+            <p>${escapeHtml([item.roleCode, item.roleTitle].filter(Boolean).join(" - ") || "Role pending")}</p>
+            <div class="meta">
+              <span>${escapeHtml(item.yearsOfExperience || "Experience pending")}</span>
+              <span>${escapeHtml(item.status || "Review")}</span>
+              <span>${escapeHtml(item.nextStep || "Verify CV details")}</span>
+            </div>
+          </div>
+          <strong>${escapeHtml(item.score || 0)}</strong>
+        </article>
+      `,
+    )
+    .join("");
+  const skillHtml = skills.map((item) => `<span>${escapeHtml(item.keyword)} <b>${item.count}</b></span>`).join("");
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(meta.clientName)} - ProfileForge Portal</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:#f4f7fb;color:#17202a}.page{max-width:1180px;margin:0 auto;padding:34px 22px}.hero{position:relative;overflow:hidden;border:1px solid #d6e1ec;border-radius:18px;padding:34px;background:linear-gradient(135deg,#ffffff,#edf6ff 42%,#fff0f7 76%,#edfff7);box-shadow:0 26px 70px rgba(23,32,42,.12)}.hero:after{content:"";position:absolute;right:-70px;top:-80px;width:260px;height:260px;border-radius:999px;background:radial-gradient(circle,rgba(224,68,154,.22),transparent 68%)}.kicker{font-weight:900;color:#214f8f;text-transform:uppercase;font-size:12px;letter-spacing:.08em}h1{margin:10px 0 8px;font-size:42px;line-height:1.05}p{line-height:1.5}.muted{color:#5c6876}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:20px 0}.stat,.candidate,.skills,.next{border:1px solid #d6e1ec;border-radius:14px;background:#fff;box-shadow:0 14px 34px rgba(23,32,42,.07)}.stat{padding:16px}.stat span{display:block;color:#5c6876;font-size:12px;font-weight:900;text-transform:uppercase}.stat b{display:block;margin-top:6px;font-size:34px}.grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr);gap:16px}.candidate{display:grid;grid-template-columns:42px minmax(0,1fr) 70px;gap:14px;align-items:center;margin-bottom:10px;padding:14px}.rank{width:36px;height:36px;display:grid;place-items:center;border-radius:999px;color:#fff;background:linear-gradient(135deg,#214f8f,#e0449a);font-weight:900}.candidate h3{margin:0 0 4px}.candidate p{margin:0;color:#5c6876}.candidate strong{justify-self:end;color:#214f8f;font-size:30px}.meta{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}.meta span,.skills span{padding:6px 9px;border-radius:999px;background:#edf6ff;color:#214f8f;font-weight:800;font-size:12px}.side{display:grid;gap:14px}.skills,.next{padding:16px}.skills div{display:flex;flex-wrap:wrap;gap:8px}.skills b{color:#c34383}.next ul{margin:8px 0 0;padding-left:20px}.footer{margin-top:18px;color:#5c6876;text-align:center;font-size:13px}@media(max-width:760px){h1{font-size:32px}.stats,.grid{grid-template-columns:1fr}.candidate{grid-template-columns:36px minmax(0,1fr)}.candidate strong{grid-column:2;justify-self:start}}
+</style>
+</head>
+<body>
+<main class="page">
+  <section class="hero">
+    <span class="kicker">${escapeHtml(toneLabel)}</span>
+    <h1>${escapeHtml(meta.clientName)}</h1>
+    <p class="muted">${escapeHtml(meta.roleLabel)} prepared by ProfileForge. Review the ranked shortlist, skill signals, and recommended next actions below.</p>
+  </section>
+  <section class="stats">
+    <article class="stat"><span>Profiles</span><b>${stats.total}</b></article>
+    <article class="stat"><span>Ready</span><b>${stats.ready}</b></article>
+    <article class="stat"><span>Average score</span><b>${stats.average}</b></article>
+    <article class="stat"><span>Senior profiles</span><b>${stats.senior}</b></article>
+  </section>
+  <section class="grid">
+    <div>${cards || "<p>No candidates available.</p>"}</div>
+    <aside class="side">
+      <div class="skills"><h2>Skill Signals</h2><div>${skillHtml || "<span>Pending</span>"}</div></div>
+      <div class="next"><h2>Recommended Review Path</h2><ul><li>Start with the top ranked profile.</li><li>Validate final CV details and availability.</li><li>Use the combined Excel workbook as the formal submission pack.</li></ul></div>
+    </aside>
+  </section>
+  <p class="footer">Generated by ProfileForge. Browser-only CV processing in the static version.</p>
+</main>
+</body>
+</html>`;
+}
+
+function renderPortal() {
+  if (!els.portalContent) return;
+  const candidates = portalCandidates();
+  if (!candidates.length) {
+    els.portalContent.innerHTML = '<div class="empty-state">Load demo or convert CVs to generate a client portal.</div>';
+    if (els.copyPortal) els.copyPortal.disabled = true;
+    if (els.downloadPortal) els.downloadPortal.disabled = true;
+    return;
+  }
+
+  if (els.copyPortal) els.copyPortal.disabled = false;
+  if (els.downloadPortal) els.downloadPortal.disabled = false;
+  const meta = portalMeta();
+  const stats = portalStats();
+  const lead = candidates[0];
+  const skills = boardroomSkillSignals(8);
+  els.portalContent.innerHTML = `
+    <div class="portal-preview tone-${escapeHtml(meta.tone)}">
+      <section class="portal-cover">
+        <div>
+          <span class="launch-kicker">${escapeHtml(meta.tone)} portal</span>
+          <h3>${escapeHtml(meta.clientName)}</h3>
+          <p>${escapeHtml(meta.roleLabel)} generated from ${stats.total} profile${stats.total === 1 ? "" : "s"}.</p>
+        </div>
+        <div class="portal-lead-score">
+          <strong>${escapeHtml(lead.score || 0)}</strong>
+          <span>Lead score</span>
+        </div>
+      </section>
+      <div class="portal-stat-grid">
+        <article><span>Profiles</span><strong>${stats.total}</strong></article>
+        <article><span>Ready</span><strong>${stats.ready}</strong></article>
+        <article><span>Average</span><strong>${stats.average}</strong></article>
+        <article><span>Senior</span><strong>${stats.senior}</strong></article>
+      </div>
+      <div class="portal-layout">
+        <section class="portal-candidate-stack">
+          ${candidates
+            .slice(0, 6)
+            .map(
+              (item, index) => `
+                <article>
+                  <b>${index + 1}</b>
+                  <div>
+                    <strong>${escapeHtml(item.candidateName)}</strong>
+                    <span>${escapeHtml([item.roleCode, item.roleTitle].filter(Boolean).join(" - ") || "Role pending")}</span>
+                    <small>${escapeHtml(item.yearsOfExperience || "Experience pending")} - ${escapeHtml(item.status || "Review")}</small>
+                  </div>
+                  <em>${escapeHtml(item.score || 0)}</em>
+                </article>
+              `,
+            )
+            .join("")}
+        </section>
+        <aside class="portal-sidecar">
+          <div>
+            <h3>Client Story</h3>
+            <p>Lead with ${escapeHtml(lead.candidateName)}, then keep the next profiles ready for role calibration and backup submission.</p>
+          </div>
+          <div>
+            <h3>Skill Signals</h3>
+            <div class="portal-skill-tags">
+              ${skills.map((item) => `<span>${escapeHtml(item.keyword)} <b>${item.count}</b></span>`).join("")}
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  `;
+}
+
+function commandButtons() {
+  return Array.from(els.commandActions?.querySelectorAll?.("[data-command]") || []);
+}
+
+function filterCommandDeck() {
+  const query = String(els.commandSearch?.value || "").trim().toLowerCase();
+  let visible = 0;
+  commandButtons().forEach((button) => {
+    const haystack = `${button.textContent || ""} ${button.dataset.keywords || ""}`.toLowerCase();
+    const match = !query || haystack.includes(query);
+    button.hidden = !match;
+    if (match) visible += 1;
+  });
+  if (els.commandEmpty) els.commandEmpty.hidden = visible !== 0;
+}
+
+function setCommandDeck(open) {
+  if (!els.commandDock) return;
+  els.commandDock.hidden = !open;
+  document.body?.classList?.toggle("command-open", open);
+  if (open) {
+    if (els.commandSearch) {
+      els.commandSearch.value = "";
+      window.setTimeout(() => els.commandSearch?.focus?.(), 0);
+    }
+    filterCommandDeck();
+  }
+}
+
+async function runCommandDeckAction(command) {
+  setCommandDeck(false);
+  switch (command) {
+    case "demo":
+      await loadDemoBatch();
+      break;
+    case "start":
+      scrollToSection("#converter");
+      showToast("Ready for a new batch");
+      break;
+    case "receipt":
+      await copyText(batchReceiptText());
+      showToast("Batch receipt copied");
+      break;
+    case "sop":
+      await copyText(assistantGuideText());
+      showToast("Assistant SOP copied");
+      break;
+    case "screening":
+      scrollToSection("#screeningPanel");
+      if (state.pipeline.length) runMatcher();
+      break;
+    case "boardroom":
+      renderBoardroom();
+      scrollToSection("#boardroomPanel");
+      showToast(state.pipeline.length ? "Boardroom opened" : "Load demo or convert CVs first");
+      break;
+    case "galaxy":
+      renderGalaxy();
+      scrollToSection("#galaxyPanel");
+      showToast(state.pipeline.length ? "Talent Galaxy opened" : "Load demo or convert CVs first");
+      break;
+    case "portal":
+      renderPortal();
+      scrollToSection("#portalPanel");
+      showToast(state.pipeline.length ? "Client Portal opened" : "Load demo or convert CVs first");
+      break;
+    case "pipeline":
+      scrollToSection("#pipelinePanel");
+      showToast("Pipeline opened");
+      break;
+    case "pricing":
+      await copyText(launchPricingText());
+      showToast("Pricing copied");
+      break;
+    case "privacy":
+      await copyText(privacyNoteText());
+      showToast("Privacy note copied");
+      break;
+    case "brief":
+      await copyText(productBriefText());
+      showToast("Product brief copied");
+      break;
+    case "launch":
+      scrollToSection("#launchDesk");
+      showToast("Launch Desk opened");
+      break;
+    default:
+      showToast("Command not available");
+  }
 }
 
 function convertButtonHtml(label) {
@@ -308,6 +1136,38 @@ function assistantGuideText() {
   ].join("\n");
 }
 
+function productBriefText() {
+  return [
+    "ProfileForge Product Brief",
+    "",
+    "ProfileForge converts PDF CVs into client-ready Excel profile workbooks in the browser.",
+    "",
+    "Core workflow:",
+    "- Upload one or many CV PDFs.",
+    "- Reorder profiles before processing.",
+    "- Review extracted candidate fields before generating Excel.",
+    "- Export individual Excel files, a combined workbook, or one stacked profile sheet.",
+    "- Use pipeline, screening, QA report, batch brief, and office SOP tools for repeat recruitment work.",
+    "- Present client-ready decisions through Boardroom Mode and Talent Galaxy visual maps.",
+    "- Generate a downloadable Client Portal HTML page for shortlist sharing.",
+    "",
+    "Best users: recruitment agencies, HR teams, office assistants, and client-submission teams who need consistent profile formatting quickly.",
+    "",
+    "Suggested founding pricing: Starter $7/month, Pro $15/month, Studio $29/month.",
+  ].join("\n");
+}
+
+function privacyNoteText() {
+  return [
+    "ProfileForge Privacy Note",
+    "",
+    "ProfileForge's static browser version processes selected CV PDFs locally in the visitor's browser.",
+    "CV files are not uploaded to a ProfileForge server in this version.",
+    "Generated Excel files are created in the browser and downloaded by the user.",
+    "Users should still handle CVs according to their company policy, client agreements, and local privacy requirements.",
+  ].join("\n");
+}
+
 function syncBackToTop() {
   if (!els.backToTop) return;
   const top = Number(window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0);
@@ -393,6 +1253,13 @@ function addPipelineRecords(records) {
   }
 }
 
+function cloneDemoRecords() {
+  return DEMO_RECORDS.map((record) => ({
+    sourceName: record.sourceName,
+    profile: { ...record.profile },
+  }));
+}
+
 function savePipeline() {
   storageSet("profileforge.pipeline.v1", state.pipeline);
 }
@@ -453,6 +1320,9 @@ function renderPipeline() {
   if (els.copyMatches) els.copyMatches.disabled = !state.pipeline.length;
   if (els.exportMatches) els.exportMatches.disabled = !state.pipeline.length;
   renderCandidatePicker();
+  renderBoardroom();
+  renderGalaxy();
+  renderPortal();
 }
 
 function updatePipelineStatus(id, status) {
@@ -2753,6 +3623,90 @@ function renderResults(results) {
   updateLaunchpad();
 }
 
+async function loadDemoBatch() {
+  if (els.loadDemo?.dataset.busy) return;
+  if (!window.JSZip) {
+    showToast("Libraries are still loading. Try again in a moment.");
+    return;
+  }
+
+  const records = cloneDemoRecords();
+  const usedNames = new Set();
+  const zip = new JSZip();
+  const results = [];
+
+  clearObjectUrls();
+  state.reviewItems = [];
+  renderReviewPanel();
+  renderBatchReceipt(null);
+  setDownloadLink(els.downloadCombined, null);
+  setDownloadLink(els.downloadZip, null);
+  setProgress("Preparing demo", 0, records.length);
+
+  if (els.loadDemo) {
+    els.loadDemo.dataset.busy = "true";
+    els.loadDemo.disabled = true;
+    els.loadDemo.innerHTML = "Loading demo";
+  }
+
+  try {
+    for (let index = 0; index < records.length; index += 1) {
+      const record = records[index];
+      const xlsxBlob = await createProfileWorkbookBlob([record], null);
+      const fileName = makeResultFileName(record.profile, record.sourceName, usedNames);
+      const url = createDownloadUrl(xlsxBlob);
+      zip.file(fileName, xlsxBlob);
+      results.push({
+        status: "done",
+        sourceName: record.sourceName,
+        candidateName: record.profile.candidateName,
+        roleCode: record.profile.roleCode,
+        roleTitle: record.profile.roleTitle,
+        yearsOfExperience: record.profile.yearsOfExperience,
+        fileName,
+        url,
+      });
+      setProgress("Preparing demo", index + 1, records.length);
+    }
+
+    const combinedBlob = await createCombinedWorkbookBlob(records, null);
+    setDownloadLink(els.downloadCombined, createDownloadUrl(combinedBlob));
+    zip.file("profileforge-demo-combined.xlsx", combinedBlob);
+    const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+    setDownloadLink(els.downloadZip, createDownloadUrl(zipBlob));
+
+    renderResults(results);
+    addPipelineRecords(records);
+    state.matchResults = roleMatchResults(els.roleRequirement?.value || "");
+    renderMatchSummary();
+    renderComparison(state.matchResults.slice(0, 5));
+    state.taskPlan = createWorkflowPlan("shortlist", "Prepare demo shortlist pack for converted CVs and flag missing candidate details.");
+    renderTaskPlan();
+    setProgress("Demo batch loaded", records.length, records.length);
+    renderBatchReceipt({
+      title: "Demo Excel pack ready",
+      summary: `${records.length} sample profiles loaded into results, pipeline, and screening.`,
+      completed: records.length,
+      failed: 0,
+      total: records.length,
+      output: receiptOutputLabel(),
+      source: "Demo batch",
+      files: results.map((result) => result.fileName).filter(Boolean),
+    });
+    document.querySelector("#automationHub")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    showToast("Demo batch loaded");
+  } catch (error) {
+    setProgress("Demo failed", 0, records.length);
+    showToast(error.message || "Unable to load demo");
+  } finally {
+    if (els.loadDemo) {
+      delete els.loadDemo.dataset.busy;
+      els.loadDemo.disabled = false;
+      els.loadDemo.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"></path><path d="M9 8h6"></path><path d="M9 12h6"></path><path d="M9 16h3"></path></svg>Load demo';
+    }
+  }
+}
+
 async function extractProfilesForReview() {
   if (!window.JSZip || !window.pdfjsLib) {
     showToast("Libraries are still loading. Try again in a moment.");
@@ -2762,6 +3716,7 @@ async function extractProfilesForReview() {
   clearObjectUrls();
   setDownloadLink(els.downloadCombined, null);
   setDownloadLink(els.downloadZip, null);
+  renderBatchReceipt(null);
   state.reviewItems = [];
   renderReviewPanel();
   renderResults([]);
@@ -2813,6 +3768,7 @@ async function convertFilesDirectly() {
   clearObjectUrls();
   setDownloadLink(els.downloadCombined, null);
   setDownloadLink(els.downloadZip, null);
+  renderBatchReceipt(null);
   els.convertButton.dataset.busy = "true";
   els.convertButton.disabled = true;
   els.convertButton.innerHTML = "Converting";
@@ -2883,6 +3839,16 @@ async function convertFilesDirectly() {
 
   const failed = results.filter((result) => result.status === "error").length;
   setProgress(failed ? "Completed with errors" : "Complete", state.files.length, state.files.length);
+  renderBatchReceipt({
+    title: failed ? "Excel pack completed with review items" : "Excel pack ready",
+    summary: `${successful.length} of ${state.files.length} profiles converted.`,
+    completed: successful.length,
+    failed,
+    total: state.files.length,
+    output: receiptOutputLabel(),
+    source: "Direct conversion",
+    files: results.filter((result) => result.status === "done").map((result) => result.fileName).filter(Boolean),
+  });
   showToast(failed ? "Completed with errors" : "Conversion complete");
   delete els.convertButton.dataset.busy;
   updateConvertState();
@@ -2898,6 +3864,7 @@ async function generateReviewedExcel() {
   clearObjectUrls();
   setDownloadLink(els.downloadCombined, null);
   setDownloadLink(els.downloadZip, null);
+  renderBatchReceipt(null);
   els.generateReviewed.disabled = true;
   els.generateReviewed.dataset.busy = "true";
   els.generateReviewed.innerHTML = "Generating";
@@ -2965,6 +3932,16 @@ async function generateReviewedExcel() {
 
   const failed = results.filter((result) => result.status === "error").length;
   setProgress(failed ? "Completed with errors" : "Complete", records.length, records.length);
+  renderBatchReceipt({
+    title: failed ? "Reviewed Excel pack completed with review items" : "Reviewed Excel pack ready",
+    summary: `${successful.length} of ${records.length} reviewed profiles exported.`,
+    completed: successful.length,
+    failed,
+    total: records.length,
+    output: receiptOutputLabel(),
+    source: "Reviewed conversion",
+    files: results.filter((result) => result.status === "done").map((result) => result.fileName).filter(Boolean),
+  });
   showToast(failed ? "Completed with errors" : "Excel files ready");
   delete els.generateReviewed.dataset.busy;
   els.generateReviewed.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M8 8h8"></path><path d="M8 12h8"></path><path d="M8 16h5"></path></svg>Generate Excel';
@@ -3009,6 +3986,10 @@ els.generateReviewed.addEventListener("click", generateReviewedExcel);
 els.clearReview.addEventListener("click", () => {
   clearReviewQueue();
   showToast("Review queue cleared");
+});
+els.copyReceipt?.addEventListener("click", async () => {
+  await copyText(batchReceiptText());
+  showToast("Batch receipt copied");
 });
 els.copyBatchBrief.addEventListener("click", async () => {
   if (els.copyBatchBrief.disabled) return;
@@ -3058,6 +4039,56 @@ els.copyMatches?.addEventListener("click", async () => {
 els.exportMatches?.addEventListener("click", () => {
   downloadTextFile("profileforge-role-match.csv", matchReportCsv(), "text/csv");
 });
+els.copyBoardroom?.addEventListener("click", async () => {
+  await copyText(boardroomMemoText());
+  showToast("Boardroom memo copied");
+});
+els.downloadBoardroom?.addEventListener("click", () => {
+  if (!state.pipeline.length) return;
+  downloadTextFile("profileforge-client-boardroom.html", boardroomReportHtml(), "text/html");
+  showToast("Boardroom HTML downloaded");
+});
+els.boardroomDemo?.addEventListener("click", async () => {
+  await loadDemoBatch();
+  scrollToSection("#boardroomPanel");
+});
+els.copyGalaxy?.addEventListener("click", async () => {
+  await copyText(galaxyMemoText());
+  showToast("Talent Galaxy map copied");
+});
+els.downloadGalaxy?.addEventListener("click", () => {
+  if (!state.pipeline.length) return;
+  downloadTextFile("profileforge-talent-galaxy.svg", galaxySvg(), "image/svg+xml");
+  showToast("Talent Galaxy SVG downloaded");
+});
+els.galaxyDemo?.addEventListener("click", async () => {
+  await loadDemoBatch();
+  scrollToSection("#galaxyPanel");
+});
+els.galaxyContent?.addEventListener("click", (event) => {
+  const trigger = event.target.closest?.("[data-id]");
+  if (!trigger) return;
+  state.galaxyFocusId = trigger.dataset.id;
+  renderGalaxy();
+});
+els.copyPortal?.addEventListener("click", async () => {
+  await copyText(portalInviteText());
+  showToast("Client portal invite copied");
+});
+els.downloadPortal?.addEventListener("click", () => {
+  if (!state.pipeline.length) return;
+  downloadTextFile("profileforge-client-portal.html", portalHtml(), "text/html");
+  showToast("Client portal HTML downloaded");
+});
+els.portalDemo?.addEventListener("click", async () => {
+  await loadDemoBatch();
+  scrollToSection("#portalPanel");
+});
+[els.portalClientName, els.portalRoleLabel, els.portalTone].forEach((input) => {
+  input?.addEventListener("input", renderPortal);
+  input?.addEventListener("change", renderPortal);
+});
+els.loadDemo?.addEventListener("click", loadDemoBatch);
 els.copyAssistantGuide?.addEventListener("click", async () => {
   await copyText(assistantGuideText());
   showToast("Assistant SOP copied");
@@ -3069,6 +4100,30 @@ els.copyPricing?.addEventListener("click", async () => {
 els.copyLaunchChecklist?.addEventListener("click", async () => {
   await copyText(launchChecklistText());
   showToast("Launch checklist copied");
+});
+els.copyProductBrief?.addEventListener("click", async () => {
+  await copyText(productBriefText());
+  showToast("Product brief copied");
+});
+els.copyPrivacyNote?.addEventListener("click", async () => {
+  await copyText(privacyNoteText());
+  showToast("Privacy note copied");
+});
+els.openCommand?.addEventListener("click", () => setCommandDeck(true));
+els.closeCommand?.addEventListener("click", () => setCommandDeck(false));
+els.commandDock?.addEventListener("click", (event) => {
+  if (event.target === els.commandDock) setCommandDeck(false);
+});
+els.commandSearch?.addEventListener("input", filterCommandDeck);
+els.commandSearch?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  const first = commandButtons().find((button) => !button.hidden);
+  if (first) runCommandDeckAction(first.dataset.command);
+});
+els.commandActions?.addEventListener("click", (event) => {
+  const button = event.target.closest?.("[data-command]");
+  if (!button) return;
+  runCommandDeckAction(button.dataset.command);
 });
 [els.starterMembers, els.proMembers, els.studioMembers].forEach((input) => {
   input?.addEventListener("input", renderLaunchRevenue);
@@ -3117,6 +4172,13 @@ els.dropzone.addEventListener("drop", (event) => addFiles(event.dataTransfer.fil
 window.addEventListener("load", updateConvertState);
 window.addEventListener("load", syncBackToTop);
 window.addEventListener("scroll", syncBackToTop, { passive: true });
+document.addEventListener?.("keydown", (event) => {
+  if (event.key === "Escape") setCommandDeck(false);
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+    event.preventDefault();
+    setCommandDeck(true);
+  }
+});
 loadThemeMode();
 renderLaunchRevenue();
 state.templateMapping = loadTemplateMapping();

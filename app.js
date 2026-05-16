@@ -1681,6 +1681,63 @@ function profileFieldValues(profile) {
   };
 }
 
+function profileQuality(profile) {
+  const fields = profileFieldValues(profile);
+  const issues = [];
+  const addIssue = (field, label, text, weight) => issues.push({ field, label, text, weight });
+  const skills = String(fields.keySkills || "")
+    .split(/[,;|]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (isPlaceholderValue(fields.roleCode)) addIssue("roleCode", "Role code", "Confirm role code", 10);
+  if (!String(fields.roleTitle || "").trim()) addIssue("roleTitle", "Role title", "Add role title", 8);
+  if (!String(fields.candidateName || "").trim()) addIssue("candidateName", "Candidate", "Add candidate name", 14);
+  if (!parseYearsNumber(fields.yearsOfExperience)) addIssue("yearsOfExperience", "Years", "Verify years of experience", 10);
+  if (isPlaceholderValue(fields.relevantExperience) || String(fields.relevantExperience || "").length < 45) {
+    addIssue("relevantExperience", "Experience", "Strengthen relevant experience", 12);
+  }
+  if (isPlaceholderValue(fields.keySkills) || skills.length < 4) addIssue("keySkills", "Skills", "Add more key skills", 12);
+  if (isPlaceholderValue(fields.certifications)) addIssue("certifications", "Certifications", "Confirm certifications", 6);
+  if (isPlaceholderValue(fields.educationalQualifications)) addIssue("educationalQualifications", "Education", "Confirm education", 8);
+  if (isPlaceholderValue(fields.previousEmployer)) addIssue("previousEmployer", "Employer", "Confirm previous employer", 8);
+  if (isPlaceholderValue(fields.projectsHandled) || String(fields.projectsHandled || "").length < 40) {
+    addIssue("projectsHandled", "Projects", "Add project highlights", 10);
+  }
+
+  const penalty = issues.reduce((total, issue) => total + issue.weight, 0);
+  const score = Math.max(45, Math.min(100, 100 - penalty));
+  const tone = score >= 88 ? "ready" : score >= 72 ? "review" : "risk";
+  const label = tone === "ready" ? "Ready" : tone === "review" ? "Review" : "Needs work";
+  return { score, tone, label, issues };
+}
+
+function qualityGateHtml(quality) {
+  const issueHtml = quality.issues.length
+    ? quality.issues
+        .slice(0, 5)
+        .map((issue) => `<span title="${escapeHtml(issue.label)}">${escapeHtml(issue.text)}</span>`)
+        .join("")
+    : "<span>Ready for Excel</span>";
+  const summary = quality.issues.length
+    ? `${quality.issues.length} check${quality.issues.length === 1 ? "" : "s"} to review before final export`
+    : "No quality issues flagged";
+
+  return `
+    <div class="quality-gate">
+      <div class="quality-score ${escapeHtml(quality.tone)}">
+        <strong>${quality.score}%</strong>
+        <small>${escapeHtml(quality.label)}</small>
+      </div>
+      <div class="quality-copy">
+        <strong>Profile Quality Gate</strong>
+        <p>${escapeHtml(summary)}</p>
+        <div class="quality-flags">${issueHtml}</div>
+      </div>
+    </div>
+  `;
+}
+
 function profileTemplateCells(profile, mapping = DEFAULT_TEMPLATE_MAPPING) {
   const fields = profileFieldValues(profile);
   const normalized = normalizeTemplateMapping(mapping);
@@ -2209,6 +2266,62 @@ function statusBadge(status) {
   return `<span class="badge ${status}">${status}</span>`;
 }
 
+function reviewProfileFromCard(item, index) {
+  const card = els.reviewList.querySelector(`[data-review-index="${index}"]`);
+  const profile = { ...item.profile };
+  for (const field of PROFILE_FIELDS) {
+    const input = card?.querySelector(`[data-review-field="${field.id}"]`);
+    if (input) {
+      profile[field.id] = String(input.value || "").trim();
+    }
+  }
+  profile.note = profile.note || PROFILE_NOTE;
+  return profile;
+}
+
+function reviewSummaryText() {
+  if (!state.reviewItems.length) return "No profiles ready";
+  const readyItems = state.reviewItems.filter((item) => item.status === "ready");
+  const failed = state.reviewItems.length - readyItems.length;
+  const qualities = readyItems.map((item) => profileQuality(item.profile));
+  const average = qualities.length ? Math.round(qualities.reduce((total, quality) => total + quality.score, 0) / qualities.length) : 0;
+  const flagged = qualities.filter((quality) => quality.issues.length).length;
+  const parts = [`${readyItems.length} profile${readyItems.length === 1 ? "" : "s"} ready`];
+  if (failed) parts.push(`${failed} failed`);
+  if (qualities.length) parts.push(`quality ${average}%`);
+  if (flagged) parts.push(`${flagged} to review`);
+  return parts.join(", ");
+}
+
+function refreshQualityGate(index) {
+  const item = state.reviewItems[index];
+  if (!item || item.status !== "ready") return;
+  const card = els.reviewList.querySelector(`[data-review-index="${index}"]`);
+  if (!card) return;
+  const profile = reviewProfileFromCard(item, index);
+  const quality = profileQuality(profile);
+  const gate = card.querySelector(".quality-gate");
+  if (gate) gate.outerHTML = qualityGateHtml(quality);
+
+  const flaggedFields = new Set(quality.issues.map((issue) => issue.field));
+  const reviewFields = card.querySelectorAll?.(".review-field") || [];
+  reviewFields.forEach((field) => {
+    field.classList.toggle("field-warning", flaggedFields.has(field.dataset.fieldId));
+  });
+
+  const readyCards = state.reviewItems
+    .map((reviewItem, reviewIndex) => (reviewItem.status === "ready" ? profileQuality(reviewProfileFromCard(reviewItem, reviewIndex)) : null))
+    .filter(Boolean);
+  const failed = state.reviewItems.filter((reviewItem) => reviewItem.status !== "ready").length;
+  const average = readyCards.length ? Math.round(readyCards.reduce((total, qualityItem) => total + qualityItem.score, 0) / readyCards.length) : 0;
+  const flagged = readyCards.filter((qualityItem) => qualityItem.issues.length).length;
+  const parts = [`${readyCards.length} profile${readyCards.length === 1 ? "" : "s"} ready`];
+  if (failed) parts.push(`${failed} failed`);
+  if (readyCards.length) parts.push(`quality ${average}%`);
+  if (flagged) parts.push(`${flagged} to review`);
+  els.reviewSummary.textContent = parts.join(", ");
+}
+
 function renderReviewPanel() {
   if (!state.reviewItems.length) {
     els.reviewPanel.hidden = true;
@@ -2219,9 +2332,8 @@ function renderReviewPanel() {
   }
 
   const ready = state.reviewItems.filter((item) => item.status === "ready").length;
-  const failed = state.reviewItems.length - ready;
   els.reviewPanel.hidden = false;
-  els.reviewSummary.textContent = `${ready} profile${ready === 1 ? "" : "s"} ready${failed ? `, ${failed} failed` : ""}`;
+  els.reviewSummary.textContent = reviewSummaryText();
   els.generateReviewed.disabled = ready === 0;
 
   els.reviewList.innerHTML = state.reviewItems
@@ -2238,12 +2350,15 @@ function renderReviewPanel() {
         `;
       }
 
+      const quality = profileQuality(item.profile);
+      const flaggedFields = new Set(quality.issues.map((issue) => issue.field));
       return `
         <article class="review-card" data-review-index="${index}">
           <div class="review-card-head">
             <strong>${escapeHtml(item.sourceName)}</strong>
             ${statusBadge("done")}
           </div>
+          ${qualityGateHtml(quality)}
           <div class="review-fields">
             ${PROFILE_FIELDS.map((field) => {
               const value = profileFieldValues(item.profile)[field.id] || "";
@@ -2251,7 +2366,7 @@ function renderReviewPanel() {
                 ? `<textarea data-review-field="${escapeHtml(field.id)}" rows="${field.id === "projectsHandled" ? 4 : 3}">${escapeHtml(value)}</textarea>`
                 : `<input data-review-field="${escapeHtml(field.id)}" type="text" value="${escapeHtml(value)}" />`;
               return `
-                <label class="review-field">
+                <label class="review-field ${flaggedFields.has(field.id) ? "field-warning" : ""}" data-field-id="${escapeHtml(field.id)}">
                   <span>${escapeHtml(field.label)}</span>
                   ${control}
                 </label>
@@ -2268,15 +2383,7 @@ function collectReviewedRecords() {
   return state.reviewItems
     .map((item, index) => {
       if (item.status !== "ready") return null;
-      const card = els.reviewList.querySelector(`[data-review-index="${index}"]`);
-      const profile = { ...item.profile };
-      for (const field of PROFILE_FIELDS) {
-        const input = card?.querySelector(`[data-review-field="${field.id}"]`);
-        if (input) {
-          profile[field.id] = String(input.value || "").trim();
-        }
-      }
-      profile.note = profile.note || PROFILE_NOTE;
+      const profile = reviewProfileFromCard(item, index);
       return { sourceName: item.sourceName, profile };
     })
     .filter(Boolean);
@@ -2566,6 +2673,11 @@ els.generateReviewed.addEventListener("click", generateReviewedExcel);
 els.clearReview.addEventListener("click", () => {
   clearReviewQueue();
   showToast("Review queue cleared");
+});
+els.reviewList.addEventListener("input", (event) => {
+  const card = event.target.closest?.(".review-card[data-review-index]");
+  if (!card) return;
+  refreshQualityGate(Number(card.dataset.reviewIndex));
 });
 els.convertButton.addEventListener("click", convertCvs);
 els.createPlan?.addEventListener("click", () => {

@@ -949,6 +949,91 @@ button,
   overflow-wrap: anywhere;
 }
 
+.quality-gate {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  margin: 0 0 12px;
+  padding: 10px;
+  border: 1px solid #d7e1eb;
+  border-radius: 8px;
+  background: #f8fbfd;
+}
+
+.quality-score {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  min-height: 78px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.quality-score strong {
+  font-size: 23px;
+  line-height: 1;
+}
+
+.quality-score small {
+  margin-top: 5px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.quality-score.ready {
+  color: var(--green);
+  border-color: #b9dfd2;
+  background: #effaf6;
+}
+
+.quality-score.review {
+  color: var(--amber);
+  border-color: #f1d49f;
+  background: #fff8e9;
+}
+
+.quality-score.risk {
+  color: var(--red);
+  border-color: #efb7b2;
+  background: #fff1f0;
+}
+
+.quality-copy {
+  min-width: 0;
+}
+
+.quality-copy strong,
+.quality-copy p {
+  margin: 0;
+}
+
+.quality-copy p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.quality-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.quality-flags span {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: var(--blue);
+  background: #e8f1f8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .review-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -966,6 +1051,10 @@ button,
   font-weight: 700;
 }
 
+.review-field.field-warning span {
+  color: var(--amber);
+}
+
 .review-field input,
 .review-field textarea {
   width: 100%;
@@ -975,6 +1064,12 @@ button,
   background: #ffffff;
   color: var(--ink);
   letter-spacing: 0;
+}
+
+.review-field.field-warning input,
+.review-field.field-warning textarea {
+  border-color: #e3b35c;
+  background: #fffaf0;
 }
 
 .review-field input {
@@ -1139,6 +1234,14 @@ tr:last-child td {
 
   .review-fields {
     grid-template-columns: 1fr;
+  }
+
+  .quality-gate {
+    grid-template-columns: 1fr;
+  }
+
+  .quality-score {
+    min-height: 64px;
   }
 
   .selected-item {

@@ -30,7 +30,10 @@ Static GitHub Pages app for converting PDF CVs into Excel profile workbooks.
 - Adds Talent Galaxy, a visual candidate constellation with score/status mapping, copyable summary, and downloadable SVG map.
 - Adds Client Portal Studio with editable client/campaign details, a live shortlist portal preview, copyable invite text, and downloadable portal HTML.
 - Adds Submission Studio with client-ready email, WhatsApp summary, send rhythm, and downloadable submission pack HTML.
+- Adds Interview Studio with panel agenda, candidate-specific questions, calendar invite text, scorecard copy, and downloadable interview kit HTML.
+- Adds Closing Studio with client feedback request, candidate prep note, offer-fee planning, closing checklist, and downloadable close pack HTML.
 - Adds Showtime Theater with live shortlist slides, speaker script, full-screen presentation mode, and downloadable deck HTML.
+- Adds Founder Cockpit with workflow traction, traffic-to-revenue forecast, founder update copy, pitch copy, and downloadable launch pack HTML.
 - Sets generated Excel output to Calibri 10.
 - Sets every profile sheet to print as A4 portrait, fit to 1 page wide by 1 page tall, with print area `A1:C13`.
 

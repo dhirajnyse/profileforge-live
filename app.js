@@ -188,6 +188,22 @@ const els = {
   copySubmissionWhatsApp: document.querySelector("#copySubmissionWhatsApp"),
   downloadSubmissionPack: document.querySelector("#downloadSubmissionPack"),
   submissionDemo: document.querySelector("#submissionDemo"),
+  interviewContent: document.querySelector("#interviewContent"),
+  interviewRoleFocus: document.querySelector("#interviewRoleFocus"),
+  interviewDuration: document.querySelector("#interviewDuration"),
+  interviewMode: document.querySelector("#interviewMode"),
+  copyInterviewInvite: document.querySelector("#copyInterviewInvite"),
+  copyInterviewScorecard: document.querySelector("#copyInterviewScorecard"),
+  downloadInterviewKit: document.querySelector("#downloadInterviewKit"),
+  interviewDemo: document.querySelector("#interviewDemo"),
+  closingContent: document.querySelector("#closingContent"),
+  closingCurrency: document.querySelector("#closingCurrency"),
+  closingPackage: document.querySelector("#closingPackage"),
+  closingFeePercent: document.querySelector("#closingFeePercent"),
+  copyClosingFeedback: document.querySelector("#copyClosingFeedback"),
+  copyCandidatePrep: document.querySelector("#copyCandidatePrep"),
+  downloadClosingPack: document.querySelector("#downloadClosingPack"),
+  closingDemo: document.querySelector("#closingDemo"),
   theaterContent: document.querySelector("#theaterContent"),
   copyTheaterScript: document.querySelector("#copyTheaterScript"),
   downloadTheaterDeck: document.querySelector("#downloadTheaterDeck"),
@@ -210,6 +226,14 @@ const els = {
   studioMembers: document.querySelector("#studioMembers"),
   launchMrr: document.querySelector("#launchMrr"),
   launchArr: document.querySelector("#launchArr"),
+  founderContent: document.querySelector("#founderContent"),
+  founderVisitors: document.querySelector("#founderVisitors"),
+  founderSignupRate: document.querySelector("#founderSignupRate"),
+  founderPaidRate: document.querySelector("#founderPaidRate"),
+  copyFounderUpdate: document.querySelector("#copyFounderUpdate"),
+  copyFounderPitch: document.querySelector("#copyFounderPitch"),
+  downloadFounderPack: document.querySelector("#downloadFounderPack"),
+  founderDemo: document.querySelector("#founderDemo"),
   openCommand: document.querySelector("#openCommand"),
   commandDock: document.querySelector("#commandDock"),
   closeCommand: document.querySelector("#closeCommand"),
@@ -1106,6 +1130,415 @@ function renderSubmission() {
   `;
 }
 
+function interviewMeta() {
+  return {
+    focus: String(els.interviewRoleFocus?.value || "Role fit, communication, delivery depth").trim() || "Role fit, communication, delivery depth",
+    duration: String(els.interviewDuration?.value || "45"),
+    mode: String(els.interviewMode?.value || "Video call"),
+  };
+}
+
+function interviewCandidates() {
+  return submissionCandidates().filter((item) => !["Rejected", "Hold"].includes(item.status));
+}
+
+function questionSeed(item) {
+  return extractKeywords(`${item.keySkills || ""} ${item.relevantExperience || ""}`).slice(0, 5);
+}
+
+function interviewQuestions(item) {
+  const skills = questionSeed(item);
+  const primary = skills[0] || "role delivery";
+  const secondary = skills[1] || "stakeholder communication";
+  const third = skills[2] || "problem solving";
+  return [
+    `Walk us through a recent project where you used ${primary} to deliver a measurable result.`,
+    `How do you explain technical decisions around ${secondary} to non-technical stakeholders?`,
+    `Describe a difficult delivery issue and how you used ${third} to recover the outcome.`,
+    `What would you validate first in the first 30 days for this role?`,
+    `Which part of your CV best proves your fit for this requirement, and why?`,
+  ];
+}
+
+function interviewAgenda() {
+  const meta = interviewMeta();
+  const duration = Number(meta.duration) || 45;
+  const intro = Math.max(4, Math.round(duration * 0.12));
+  const cv = Math.max(10, Math.round(duration * 0.28));
+  const technical = Math.max(12, Math.round(duration * 0.34));
+  const scenario = Math.max(6, Math.round(duration * 0.16));
+  const close = Math.max(4, duration - intro - cv - technical - scenario);
+  return [
+    [`Intro and role context`, intro],
+    [`CV walkthrough and delivery depth`, cv],
+    [`Technical and skill validation`, technical],
+    [`Scenario or client communication probe`, scenario],
+    [`Candidate questions and next steps`, close],
+  ];
+}
+
+function interviewInviteText() {
+  const candidates = interviewCandidates();
+  if (!candidates.length) return "No interview invite is available yet. Load demo or convert CVs first.";
+  const meta = interviewMeta();
+  const top = candidates.slice(0, 4);
+  return [
+    `Subject: Interview plan - ${portalMeta().roleLabel}`,
+    "",
+    `Interview mode: ${meta.mode}`,
+    `Duration: ${meta.duration} minutes`,
+    `Focus: ${meta.focus}`,
+    "",
+    "Candidates to schedule:",
+    ...top.map((item, index) => `${index + 1}. ${item.candidateName} - ${[item.roleCode, item.roleTitle].filter(Boolean).join(" - ") || "Role pending"} - ${item.yearsOfExperience || "Experience pending"}`),
+    "",
+    "Suggested agenda:",
+    ...interviewAgenda().map(([label, minutes]) => `- ${label}: ${minutes} min`),
+  ].join("\n");
+}
+
+function interviewScorecardText() {
+  const candidates = interviewCandidates();
+  if (!candidates.length) return "No interview scorecard is available yet. Load demo or convert CVs first.";
+  const meta = interviewMeta();
+  return [
+    "ProfileForge Interview Scorecard",
+    "",
+    `Focus: ${meta.focus}`,
+    `Mode: ${meta.mode}`,
+    `Duration: ${meta.duration} minutes`,
+    "",
+    "Scoring rubric:",
+    "1. Role fit / 20",
+    "2. Technical depth / 20",
+    "3. Delivery evidence / 20",
+    "4. Communication / 20",
+    "5. Availability and client fit / 20",
+    "",
+    ...candidates.slice(0, 5).map((item, index) => {
+      return [
+        `Candidate ${index + 1}: ${item.candidateName}`,
+        `Score before interview: ${item.score}`,
+        "Questions:",
+        ...interviewQuestions(item).map((question) => `- ${question}`),
+      ].join("\n");
+    }),
+  ].join("\n\n");
+}
+
+function interviewKitHtml() {
+  const meta = interviewMeta();
+  const candidates = interviewCandidates();
+  const agenda = interviewAgenda();
+  const cards = candidates
+    .slice(0, 8)
+    .map(
+      (item) => `
+        <article class="candidate">
+          <h3>${escapeHtml(item.candidateName)}</h3>
+          <p>${escapeHtml([item.roleCode, item.roleTitle].filter(Boolean).join(" - ") || "Role pending")}</p>
+          <div class="badges"><span>${escapeHtml(item.yearsOfExperience || "Experience pending")}</span><span>${escapeHtml(item.status || "Review")}</span><span>${escapeHtml(item.score || 0)} score</span></div>
+          <h4>Questions</h4>
+          <ol>${interviewQuestions(item).map((question) => `<li>${escapeHtml(question)}</li>`).join("")}</ol>
+        </article>
+      `,
+    )
+    .join("");
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProfileForge Interview Kit</title>
+<style>
+body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f4f7fb;color:#17202a}.wrap{max-width:1120px;margin:auto;padding:30px}.hero,.candidate,.agenda,.rubric{border:1px solid #d6e1ec;border-radius:16px;background:#fff;box-shadow:0 18px 48px rgba(23,32,42,.08)}.hero{padding:28px;background:linear-gradient(135deg,#fff,#edf6ff 45%,#edfff7)}.kicker{font-size:12px;font-weight:900;color:#214f8f;text-transform:uppercase}h1{margin:8px 0;font-size:36px}.muted{color:#5c6876}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}.agenda,.rubric,.candidate{padding:18px}.agenda li,.rubric li,.candidate li{margin-bottom:8px;line-height:1.45}.badges{display:flex;flex-wrap:wrap;gap:7px}.badges span{padding:6px 9px;border-radius:999px;background:#edf6ff;color:#214f8f;font-weight:800;font-size:12px}@media(max-width:760px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="hero"><span class="kicker">ProfileForge Interview Kit</span><h1>${escapeHtml(portalMeta().roleLabel)}</h1><p class="muted">${escapeHtml(meta.mode)} - ${escapeHtml(meta.duration)} minutes - ${escapeHtml(meta.focus)}</p></section>
+  <section class="grid">
+    <div class="agenda"><h2>Agenda</h2><ol>${agenda.map(([label, minutes]) => `<li>${escapeHtml(label)} - ${minutes} min</li>`).join("")}</ol></div>
+    <div class="rubric"><h2>Scorecard</h2><ol><li>Role fit / 20</li><li>Technical depth / 20</li><li>Delivery evidence / 20</li><li>Communication / 20</li><li>Availability and client fit / 20</li></ol></div>
+  </section>
+  <section class="grid">${cards || "<p>No candidates available.</p>"}</section>
+</main>
+</body>
+</html>`;
+}
+
+function renderInterview() {
+  if (!els.interviewContent) return;
+  const candidates = interviewCandidates();
+  if (!candidates.length) {
+    els.interviewContent.innerHTML = '<div class="empty-state">Load demo or convert CVs to build interview kits.</div>';
+    if (els.copyInterviewInvite) els.copyInterviewInvite.disabled = true;
+    if (els.copyInterviewScorecard) els.copyInterviewScorecard.disabled = true;
+    if (els.downloadInterviewKit) els.downloadInterviewKit.disabled = true;
+    return;
+  }
+
+  if (els.copyInterviewInvite) els.copyInterviewInvite.disabled = false;
+  if (els.copyInterviewScorecard) els.copyInterviewScorecard.disabled = false;
+  if (els.downloadInterviewKit) els.downloadInterviewKit.disabled = false;
+  const meta = interviewMeta();
+  const agenda = interviewAgenda();
+  const lead = candidates[0];
+  els.interviewContent.innerHTML = `
+    <div class="interview-dashboard">
+      <article><span>Lead interview</span><strong>${escapeHtml(lead.candidateName)}</strong><small>${escapeHtml(lead.score || 0)} score</small></article>
+      <article><span>Mode</span><strong>${escapeHtml(meta.mode)}</strong><small>${escapeHtml(meta.duration)} minutes</small></article>
+      <article><span>Focus</span><strong>${escapeHtml(meta.focus)}</strong></article>
+      <article><span>Interview queue</span><strong>${candidates.length}</strong><small>active profiles</small></article>
+    </div>
+    <div class="interview-layout">
+      <section class="interview-questions">
+        <div class="section-title">
+          <h3>Candidate Questions</h3>
+          <span>${escapeHtml(lead.candidateName)}</span>
+        </div>
+        <ol>${interviewQuestions(lead).map((question) => `<li>${escapeHtml(question)}</li>`).join("")}</ol>
+      </section>
+      <aside class="interview-side">
+        <div class="interview-agenda">
+          <h3>Panel Agenda</h3>
+          ${agenda.map(([label, minutes]) => `<div><span>${escapeHtml(label)}</span><b>${minutes} min</b></div>`).join("")}
+        </div>
+        <div class="interview-rubric">
+          <h3>Scorecard Rubric</h3>
+          <span>Role fit</span>
+          <span>Technical depth</span>
+          <span>Delivery evidence</span>
+          <span>Communication</span>
+          <span>Availability and client fit</span>
+        </div>
+      </aside>
+    </div>
+  `;
+}
+
+function closingCandidates() {
+  const active = interviewCandidates().filter((item) => !["Rejected", "Hold"].includes(item.status));
+  return active.length ? active : submissionCandidates();
+}
+
+function closingMeta() {
+  const currency = String(els.closingCurrency?.value || "AED");
+  const packageValue = Math.max(0, Number(els.closingPackage?.value || 0) || 0);
+  const feePercent = Math.max(0, Math.min(100, Number(els.closingFeePercent?.value || 0) || 0));
+  return { currency, packageValue, feePercent };
+}
+
+function formatMoney(currency, value) {
+  return `${currency} ${Math.round(Number(value) || 0).toLocaleString("en-US")}`;
+}
+
+function closingStats() {
+  const candidates = closingCandidates();
+  const meta = closingMeta();
+  const lead = candidates[0];
+  const shortlists = candidates.filter((item) => ["Shortlist", "Interview", "Submitted"].includes(item.status)).length;
+  const feeValue = meta.packageValue * (meta.feePercent / 100);
+  return {
+    total: candidates.length,
+    leadName: lead?.candidateName || "Lead candidate",
+    leadScore: lead?.score || 0,
+    shortlists,
+    backups: Math.max(0, candidates.length - 1),
+    feeValue,
+  };
+}
+
+function closingFeedbackText() {
+  const candidates = closingCandidates();
+  if (!candidates.length) return "No closing feedback request yet. Load demo or convert CVs first.";
+  const meta = portalMeta();
+  const stats = closingStats();
+  const top = candidates.slice(0, 6);
+  return [
+    `Subject: Feedback requested - ${meta.roleLabel}`,
+    "",
+    `Dear ${meta.clientName},`,
+    "",
+    `Sharing the closing decision request for ${meta.roleLabel}.`,
+    `Lead recommendation: ${stats.leadName} (${stats.leadScore} score)`,
+    `Profiles ready for decision: ${stats.shortlists || stats.total}`,
+    "",
+    "Please reply against each profile with one of these:",
+    "- Proceed to interview",
+    "- Keep as backup",
+    "- Need clarification",
+    "- Not suitable",
+    "",
+    "Candidates:",
+    ...top.map((item, index) => `${index + 1}. ${item.candidateName} - ${[item.roleCode, item.roleTitle].filter(Boolean).join(" - ") || "Role pending"} - ${item.yearsOfExperience || "Experience pending"} - score ${item.score}`),
+    "",
+    `Suggested feedback deadline: ${nextBusinessDate(1)}`,
+    "",
+    "Once feedback is received, we will confirm candidate availability, interview slots, compensation alignment, and final submission documents.",
+  ].join("\n");
+}
+
+function candidatePrepText() {
+  const candidates = closingCandidates();
+  if (!candidates.length) return "No candidate prep note yet. Load demo or convert CVs first.";
+  const lead = candidates[0];
+  const role = [lead.roleCode, lead.roleTitle].filter(Boolean).join(" - ") || portalMeta().roleLabel;
+  const skills = extractKeywords(`${lead.keySkills || ""} ${lead.relevantExperience || ""}`).slice(0, 5);
+  return [
+    `Candidate prep note - ${lead.candidateName}`,
+    "",
+    `Role: ${role}`,
+    `Current stage: ${lead.status || "Review"}`,
+    `Experience: ${lead.yearsOfExperience || "Experience pending"}`,
+    "",
+    "Prepare these talking points:",
+    `- Two recent examples proving ${skills[0] || "role delivery"}.`,
+    `- One client or stakeholder communication example around ${skills[1] || "business impact"}.`,
+    `- One delivery challenge and recovery story using ${skills[2] || "problem solving"}.`,
+    "- Notice period, availability, location or remote preference, and compensation expectation.",
+    "- Updated CV, ID or eligibility documents, and interview time windows.",
+    "",
+    "Recruiter close check:",
+    "- Confirm the candidate is interested before sharing final availability.",
+    "- Confirm package expectation is aligned before client interview.",
+    "- Capture any competing interviews or offer deadlines.",
+  ].join("\n");
+}
+
+function closingPackHtml() {
+  const candidates = closingCandidates();
+  const meta = portalMeta();
+  const closeMeta = closingMeta();
+  const stats = closingStats();
+  const cards = candidates
+    .slice(0, 10)
+    .map(
+      (item, index) => `
+        <article class="candidate">
+          <div class="rank">${index + 1}</div>
+          <div>
+            <h3>${escapeHtml(item.candidateName)}</h3>
+            <p>${escapeHtml([item.roleCode, item.roleTitle].filter(Boolean).join(" - ") || "Role pending")}</p>
+            <span>${escapeHtml(item.yearsOfExperience || "Experience pending")}</span>
+            <span>${escapeHtml(item.status || "Review")}</span>
+            <span>${escapeHtml(item.nextStep || "Verify fit")}</span>
+          </div>
+          <strong>${escapeHtml(item.score || 0)}</strong>
+        </article>
+      `,
+    )
+    .join("");
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(meta.clientName)} - ProfileForge Closing Pack</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:#f4f7fb;color:#17202a}.wrap{max-width:1180px;margin:auto;padding:30px}.hero,.stat,.candidate,.panel{border:1px solid #d6e1ec;border-radius:18px;background:#fff;box-shadow:0 18px 48px rgba(23,32,42,.08)}.hero{padding:30px;background:linear-gradient(135deg,#fff,#edf8ff 34%,#fff0f7 70%,#edfff7)}.kicker{font-size:12px;font-weight:900;text-transform:uppercase;color:#214f8f}h1{margin:8px 0;font-size:42px;line-height:1.05}.muted{color:#5c6876}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0}.stat{padding:16px}.stat span{display:block;color:#5c6876;font-size:12px;font-weight:900;text-transform:uppercase}.stat b{display:block;margin-top:6px;font-size:30px}.layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(300px,.8fr);gap:14px}.candidate{display:grid;grid-template-columns:38px minmax(0,1fr) 70px;gap:12px;align-items:center;margin-bottom:10px;padding:14px}.rank{width:34px;height:34px;display:grid;place-items:center;border-radius:999px;background:linear-gradient(135deg,#214f8f,#e0449a);color:#fff;font-weight:900}.candidate h3{margin:0 0 4px}.candidate p{margin:0 0 8px;color:#5c6876}.candidate span{display:inline-flex;margin:0 6px 6px 0;padding:6px 9px;border-radius:999px;background:#edf6ff;color:#214f8f;font-size:12px;font-weight:800}.candidate strong{justify-self:end;color:#214f8f;font-size:30px}.panel{padding:18px}.panel ol,.panel ul{margin:8px 0 0;padding-left:20px;line-height:1.55}.fee{font-size:34px;color:#0e8565;font-weight:900}.footer{margin-top:18px;text-align:center;color:#5c6876}@media(max-width:760px){h1{font-size:32px}.stats,.layout{grid-template-columns:1fr}.candidate{grid-template-columns:34px minmax(0,1fr)}.candidate strong{grid-column:2;justify-self:start}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="hero">
+    <span class="kicker">ProfileForge Closing Pack</span>
+    <h1>${escapeHtml(meta.clientName)}</h1>
+    <p class="muted">${escapeHtml(meta.roleLabel)} closing plan with candidate decision queue, feedback request, prep checklist, and estimated placement fee.</p>
+  </section>
+  <section class="stats">
+    <article class="stat"><span>Profiles</span><b>${stats.total}</b></article>
+    <article class="stat"><span>Lead score</span><b>${stats.leadScore}</b></article>
+    <article class="stat"><span>Backups</span><b>${stats.backups}</b></article>
+    <article class="stat"><span>Fee estimate</span><b>${escapeHtml(formatMoney(closeMeta.currency, stats.feeValue))}</b></article>
+  </section>
+  <section class="layout">
+    <div>${cards || "<p>No candidates available.</p>"}</div>
+    <aside class="panel">
+      <h2>Close Checklist</h2>
+      <ol>
+        <li>Get client decision against each candidate.</li>
+        <li>Confirm candidate interest, availability, package expectation, and notice period.</li>
+        <li>Lock interview slot or final submission deadline.</li>
+        <li>Track objections and keep backup profiles warm.</li>
+      </ol>
+      <h2>Commercial Note</h2>
+      <p class="muted">Package: ${escapeHtml(formatMoney(closeMeta.currency, closeMeta.packageValue))}<br>Fee: ${escapeHtml(closeMeta.feePercent)}%</p>
+      <div class="fee">${escapeHtml(formatMoney(closeMeta.currency, stats.feeValue))}</div>
+    </aside>
+  </section>
+  <p class="footer">Generated by ProfileForge Closing Studio</p>
+</main>
+</body>
+</html>`;
+}
+
+function renderClosing() {
+  if (!els.closingContent) return;
+  const candidates = closingCandidates();
+  if (!candidates.length) {
+    els.closingContent.innerHTML = '<div class="empty-state">Load demo or convert CVs to build a closing pack.</div>';
+    if (els.copyClosingFeedback) els.copyClosingFeedback.disabled = true;
+    if (els.copyCandidatePrep) els.copyCandidatePrep.disabled = true;
+    if (els.downloadClosingPack) els.downloadClosingPack.disabled = true;
+    return;
+  }
+
+  if (els.copyClosingFeedback) els.copyClosingFeedback.disabled = false;
+  if (els.copyCandidatePrep) els.copyCandidatePrep.disabled = false;
+  if (els.downloadClosingPack) els.downloadClosingPack.disabled = false;
+  const meta = closingMeta();
+  const stats = closingStats();
+  const lead = candidates[0];
+  els.closingContent.innerHTML = `
+    <div class="closing-dashboard">
+      <article><span>Lead close</span><strong>${escapeHtml(stats.leadName)}</strong><small>${escapeHtml(stats.leadScore)} score</small></article>
+      <article><span>Profiles in play</span><strong>${stats.total}</strong><small>${stats.shortlists || stats.total} ready</small></article>
+      <article><span>Estimated fee</span><strong>${escapeHtml(formatMoney(meta.currency, stats.feeValue))}</strong><small>${escapeHtml(meta.feePercent)}% of ${escapeHtml(formatMoney(meta.currency, meta.packageValue))}</small></article>
+      <article><span>Backup bench</span><strong>${stats.backups}</strong><small>warm alternatives</small></article>
+    </div>
+    <div class="closing-layout">
+      <section class="closing-board">
+        <div class="section-title">
+          <h3>Decision Queue</h3>
+          <span>Feedback required by ${escapeHtml(nextBusinessDate(1))}</span>
+        </div>
+        ${candidates
+          .slice(0, 8)
+          .map(
+            (item, index) => `
+              <article>
+                <b>${index + 1}</b>
+                <div>
+                  <strong>${escapeHtml(item.candidateName)}</strong>
+                  <small>${escapeHtml([item.roleCode, item.roleTitle].filter(Boolean).join(" - ") || "Role pending")}</small>
+                </div>
+                <span>${escapeHtml(item.status || "Review")}</span>
+              </article>
+            `,
+          )
+          .join("")}
+      </section>
+      <aside class="closing-side">
+        <div class="closing-fee-card">
+          <span>Commercial Close</span>
+          <strong>${escapeHtml(formatMoney(meta.currency, stats.feeValue))}</strong>
+          <small>${escapeHtml(formatMoney(meta.currency, meta.packageValue))} package at ${escapeHtml(meta.feePercent)}%</small>
+        </div>
+        <div class="closing-checklist">
+          <h3>Close Checklist</h3>
+          <ol>
+            <li>Ask client to choose interview, backup, clarify, or reject.</li>
+            <li>Prep ${escapeHtml(lead.candidateName)} on role fit and compensation alignment.</li>
+            <li>Capture notice period, availability, and competing process risk.</li>
+            <li>Keep ${stats.backups} backup profile${stats.backups === 1 ? "" : "s"} warm until decision.</li>
+          </ol>
+        </div>
+      </aside>
+    </div>
+  `;
+}
+
 function theaterCandidates() {
   return portalCandidates();
 }
@@ -1442,6 +1875,16 @@ async function runCommandDeckAction(command) {
       scrollToSection("#submissionPanel");
       showToast(state.pipeline.length ? "Submission Studio opened" : "Load demo or convert CVs first");
       break;
+    case "interview":
+      renderInterview();
+      scrollToSection("#interviewPanel");
+      showToast(state.pipeline.length ? "Interview Studio opened" : "Load demo or convert CVs first");
+      break;
+    case "closing":
+      renderClosing();
+      scrollToSection("#closingPanel");
+      showToast(state.pipeline.length ? "Closing Studio opened" : "Load demo or convert CVs first");
+      break;
     case "theater":
       renderTheater();
       scrollToSection("#theaterPanel");
@@ -1467,6 +1910,11 @@ async function runCommandDeckAction(command) {
     case "launch":
       scrollToSection("#launchDesk");
       showToast("Launch Desk opened");
+      break;
+    case "founder":
+      renderFounderCockpit();
+      scrollToSection("#founderCockpit");
+      showToast(state.pipeline.length ? "Founder Cockpit opened" : "Load demo or convert CVs first");
       break;
     default:
       showToast("Command not available");
@@ -1573,11 +2021,195 @@ function launchMemberCount(input) {
   return Math.max(0, Number.parseInt(input?.value || "0", 10) || 0);
 }
 
+function launchMrrValue() {
+  return launchMemberCount(els.starterMembers) * 7 + launchMemberCount(els.proMembers) * 15 + launchMemberCount(els.studioMembers) * 29;
+}
+
 function renderLaunchRevenue() {
   if (!els.launchMrr || !els.launchArr) return;
-  const mrr = launchMemberCount(els.starterMembers) * 7 + launchMemberCount(els.proMembers) * 15 + launchMemberCount(els.studioMembers) * 29;
+  const mrr = launchMrrValue();
   els.launchMrr.textContent = formatUsd(mrr);
   els.launchArr.textContent = `${formatUsd(mrr * 12)} yearly run rate`;
+  renderFounderCockpit();
+}
+
+function boundedPercent(input, fallback) {
+  return Math.max(0, Math.min(100, Number(input?.value || fallback) || 0));
+}
+
+function founderScenario() {
+  const visitors = Math.max(0, Number.parseInt(els.founderVisitors?.value || "0", 10) || 0);
+  const signupRate = boundedPercent(els.founderSignupRate, 8);
+  const paidRate = boundedPercent(els.founderPaidRate, 18);
+  const signups = Math.round(visitors * (signupRate / 100));
+  const paidUsers = Math.round(signups * (paidRate / 100));
+  const blendedPlanValue = 0.32 * 7 + 0.48 * 15 + 0.2 * 29;
+  const projectedMrr = Math.round(paidUsers * blendedPlanValue);
+  return { visitors, signupRate, paidRate, signups, paidUsers, projectedMrr };
+}
+
+function founderMetrics() {
+  const candidates = boardroomCandidates();
+  const profiles = candidates.length;
+  const shortlist = candidates.filter((item) => ["Shortlist", "Interview", "Submitted"].includes(item.status)).length;
+  const submitted = candidates.filter((item) => ["Submitted"].includes(item.status)).length;
+  const interview = candidates.filter((item) => ["Interview", "Submitted"].includes(item.status)).length;
+  const averageScore = profiles ? Math.round(candidates.reduce((sum, item) => sum + (Number(item.score) || 0), 0) / profiles) : 0;
+  const topRole = candidates[0] ? [candidates[0].roleCode, candidates[0].roleTitle].filter(Boolean).join(" - ") : "Priority recruitment workflow";
+  const strongestSkill = boardroomSkillSignals(1)[0]?.keyword || "profile automation";
+  const closing = closingStats();
+  const scenario = founderScenario();
+  const currentMrr = launchMrrValue();
+  const totalMrr = currentMrr + scenario.projectedMrr;
+  return {
+    profiles,
+    shortlist,
+    submitted,
+    interview,
+    averageScore,
+    topRole,
+    strongestSkill,
+    closingFee: closing.feeValue || 0,
+    currentMrr,
+    ...scenario,
+    totalMrr,
+  };
+}
+
+function founderUpdateText() {
+  const metrics = founderMetrics();
+  return [
+    "ProfileForge Founder Update",
+    "",
+    `This week ProfileForge moved from a CV-to-Excel utility into a recruitment operating cockpit.`,
+    `Profiles in active workflow: ${metrics.profiles}`,
+    `Shortlist-ready profiles: ${metrics.shortlist}`,
+    `Average candidate score: ${metrics.averageScore || "pending"}`,
+    `Strongest skill signal: ${metrics.strongestSkill}`,
+    `Current MRR scenario: ${formatUsd(metrics.currentMrr)}`,
+    `Projected new MRR from traffic: ${formatUsd(metrics.projectedMrr)} from ${metrics.visitors.toLocaleString("en-US")} monthly visitors`,
+    "",
+    "New product edge:",
+    "- Browser-only PDF processing for privacy-first CV workflows.",
+    "- Excel output with profile formatting, review, QA, combined workbooks, and print-ready sheets.",
+    "- Client Portal, Boardroom, Talent Galaxy, Submission Studio, Interview Studio, Closing Studio, Showtime Theater, and Founder Cockpit.",
+    "",
+    "Next move: connect domain, publish the public demo, invite early recruitment teams, and track profile conversions plus template requests.",
+  ].join("\n");
+}
+
+function founderPitchText() {
+  const metrics = founderMetrics();
+  return [
+    "ProfileForge Pitch",
+    "",
+    "One-liner:",
+    "ProfileForge is a browser-first recruitment workflow product that turns messy CV PDFs into client-ready Excel profiles, shortlist intelligence, submission packs, interviews, closing actions, and founder-level traction metrics.",
+    "",
+    "Why it matters:",
+    "Recruitment teams still lose hours copying CV data, formatting client profiles, chasing feedback, and building repetitive submission packs. ProfileForge compresses that work into one private browser workflow.",
+    "",
+    "Launch signal:",
+    `${metrics.profiles || "Demo"} profiles can move from PDF upload to Excel, portal, submission, interview, close, and launch reporting without a backend server.`,
+    "",
+    `Simple founding pricing: Starter $7, Pro $15, Studio $29. Current scenario: ${formatUsd(metrics.currentMrr)} MRR, traffic upside: ${formatUsd(metrics.projectedMrr)} MRR.`,
+  ].join("\n");
+}
+
+function founderPackHtml() {
+  const metrics = founderMetrics();
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProfileForge Founder Cockpit</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:#07111f;color:#17202a}.page{max-width:1180px;margin:auto;padding:30px}.hero,.card,.story{border:1px solid rgba(255,255,255,.18);border-radius:22px;background:linear-gradient(135deg,#fff,#edf8ff 38%,#fff0f7 72%,#edfff7);box-shadow:0 28px 80px rgba(0,0,0,.26)}.hero{padding:34px}.kicker{color:#214f8f;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}h1{margin:8px 0;font-size:46px;line-height:1.04}.muted{color:#5c6876}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0}.card{padding:18px}.card span{display:block;color:#5c6876;font-size:12px;font-weight:900;text-transform:uppercase}.card b{display:block;margin-top:8px;font-size:34px}.layout{display:grid;grid-template-columns:1fr 1fr;gap:14px}.story{padding:22px}.story li{margin-bottom:8px;line-height:1.5}.big{color:#0e8565;font-size:42px;font-weight:900}.footer{margin-top:18px;color:#cbd5e1;text-align:center}@media(max-width:760px){.grid,.layout{grid-template-columns:1fr}h1{font-size:34px}}
+</style>
+</head>
+<body>
+<main class="page">
+  <section class="hero">
+    <span class="kicker">ProfileForge Founder Cockpit</span>
+    <h1>Recruitment workflow traction in one view</h1>
+    <p class="muted">A launch-ready story built from real product workflow: PDF to Excel, shortlist intelligence, client portal, submission, interview, close, and revenue forecast.</p>
+  </section>
+  <section class="grid">
+    <article class="card"><span>Profiles</span><b>${metrics.profiles}</b></article>
+    <article class="card"><span>Shortlist</span><b>${metrics.shortlist}</b></article>
+    <article class="card"><span>Projected MRR</span><b>${formatUsd(metrics.projectedMrr)}</b></article>
+    <article class="card"><span>Total Scenario</span><b>${formatUsd(metrics.totalMrr)}</b></article>
+  </section>
+  <section class="layout">
+    <article class="story">
+      <span class="kicker">Launch Narrative</span>
+      <h2>From formatting pain to recruitment command center</h2>
+      <ul>
+        <li>Private browser-only CV PDF processing.</li>
+        <li>Calibri 10, A4 portrait, print-ready Excel output.</li>
+        <li>Client portal, shortlist theater, interview kit, and closing pack.</li>
+        <li>Low-friction founding pricing for small agencies and office assistants.</li>
+      </ul>
+    </article>
+    <article class="story">
+      <span class="kicker">Forecast</span>
+      <h2>${metrics.visitors.toLocaleString("en-US")} monthly visitors</h2>
+      <p class="muted">${metrics.signupRate}% signup rate and ${metrics.paidRate}% paid conversion creates ${metrics.paidUsers} paid users.</p>
+      <div class="big">${formatUsd(metrics.projectedMrr)}</div>
+      <p class="muted">Projected new monthly recurring revenue.</p>
+    </article>
+  </section>
+  <p class="footer">Generated by ProfileForge Founder Cockpit</p>
+</main>
+</body>
+</html>`;
+}
+
+function renderFounderCockpit() {
+  if (!els.founderContent) return;
+  const metrics = founderMetrics();
+  if (!metrics.profiles) {
+    els.founderContent.innerHTML = '<div class="empty-state">Load demo or convert CVs to build founder metrics.</div>';
+    if (els.copyFounderUpdate) els.copyFounderUpdate.disabled = true;
+    if (els.copyFounderPitch) els.copyFounderPitch.disabled = true;
+    if (els.downloadFounderPack) els.downloadFounderPack.disabled = true;
+    return;
+  }
+
+  if (els.copyFounderUpdate) els.copyFounderUpdate.disabled = false;
+  if (els.copyFounderPitch) els.copyFounderPitch.disabled = false;
+  if (els.downloadFounderPack) els.downloadFounderPack.disabled = false;
+  const readyRate = metrics.profiles ? Math.round((metrics.shortlist / metrics.profiles) * 100) : 0;
+  els.founderContent.innerHTML = `
+    <div class="founder-dashboard">
+      <article><span>Workflow profiles</span><strong>${metrics.profiles}</strong><small>${metrics.shortlist} shortlist-ready</small></article>
+      <article><span>Ready rate</span><strong>${readyRate}%</strong><small>${metrics.averageScore || 0} avg score</small></article>
+      <article><span>Projected MRR</span><strong>${formatUsd(metrics.projectedMrr)}</strong><small>${metrics.paidUsers} paid users from traffic</small></article>
+      <article><span>Total scenario</span><strong>${formatUsd(metrics.totalMrr)}</strong><small>${formatUsd(metrics.totalMrr * 12)} yearly run rate</small></article>
+    </div>
+    <div class="founder-layout">
+      <section class="founder-story-card">
+        <span class="launch-kicker">Launch story</span>
+        <h3>ProfileForge is no longer just a formatter</h3>
+        <p>It now covers the public product story end to end: CV ingestion, Excel output, QA, client portal, submission copy, interview kit, closing pack, presentation mode, pricing, and founder traction.</p>
+        <div class="founder-signal-strip">
+          <span>${escapeHtml(metrics.topRole || "Priority workflow")}</span>
+          <span>${escapeHtml(metrics.strongestSkill)}</span>
+          <span>${formatUsd(metrics.closingFee)} close-fee signal</span>
+        </div>
+      </section>
+      <aside class="founder-forecast-card">
+        <h3>Traffic to Revenue Forecast</h3>
+        <div class="founder-funnel">
+          <div><span>Visitors</span><b>${metrics.visitors.toLocaleString("en-US")}</b></div>
+          <div><span>Signups</span><b>${metrics.signups.toLocaleString("en-US")}</b></div>
+          <div><span>Paid users</span><b>${metrics.paidUsers.toLocaleString("en-US")}</b></div>
+          <div><span>New MRR</span><b>${formatUsd(metrics.projectedMrr)}</b></div>
+        </div>
+      </aside>
+    </div>
+  `;
 }
 
 function launchPricingText() {
@@ -1639,7 +2271,10 @@ function productBriefText() {
     "- Present client-ready decisions through Boardroom Mode and Talent Galaxy visual maps.",
     "- Generate a downloadable Client Portal HTML page for shortlist sharing.",
     "- Produce client email, WhatsApp copy, and submission pack HTML from Submission Studio.",
+    "- Build interview agendas, scorecards, and question kits from Interview Studio.",
+    "- Prepare client feedback, candidate prep, offer math, and closing packs from Closing Studio.",
     "- Run Showtime Theater for live client-call presentations and deck export.",
+    "- Use Founder Cockpit to turn workflow activity into launch traction, forecast, pitch, and public updates.",
     "",
     "Best users: recruitment agencies, HR teams, office assistants, and client-submission teams who need consistent profile formatting quickly.",
     "",
@@ -1814,7 +2449,10 @@ function renderPipeline() {
   renderGalaxy();
   renderPortal();
   renderSubmission();
+  renderInterview();
+  renderClosing();
   renderTheater();
+  renderFounderCockpit();
 }
 
 function updatePipelineStatus(id, status) {
@@ -4580,11 +5218,15 @@ els.portalDemo?.addEventListener("click", async () => {
   input?.addEventListener("input", () => {
     renderPortal();
     renderSubmission();
+    renderInterview();
+    renderClosing();
     renderTheater();
   });
   input?.addEventListener("change", () => {
     renderPortal();
     renderSubmission();
+    renderInterview();
+    renderClosing();
     renderTheater();
   });
 });
@@ -4608,6 +5250,54 @@ els.submissionDemo?.addEventListener("click", async () => {
 [els.submissionClientContact, els.submissionSenderName, els.submissionTone].forEach((input) => {
   input?.addEventListener("input", renderSubmission);
   input?.addEventListener("change", renderSubmission);
+});
+els.copyInterviewInvite?.addEventListener("click", async () => {
+  await copyText(interviewInviteText());
+  showToast("Interview invite copied");
+});
+els.copyInterviewScorecard?.addEventListener("click", async () => {
+  await copyText(interviewScorecardText());
+  showToast("Interview scorecard copied");
+});
+els.downloadInterviewKit?.addEventListener("click", () => {
+  if (!state.pipeline.length) return;
+  downloadTextFile("profileforge-interview-kit.html", interviewKitHtml(), "text/html");
+  showToast("Interview kit downloaded");
+});
+els.interviewDemo?.addEventListener("click", async () => {
+  await loadDemoBatch();
+  scrollToSection("#interviewPanel");
+});
+[els.interviewRoleFocus, els.interviewDuration, els.interviewMode].forEach((input) => {
+  input?.addEventListener("input", renderInterview);
+  input?.addEventListener("change", renderInterview);
+});
+els.copyClosingFeedback?.addEventListener("click", async () => {
+  await copyText(closingFeedbackText());
+  showToast("Closing feedback request copied");
+});
+els.copyCandidatePrep?.addEventListener("click", async () => {
+  await copyText(candidatePrepText());
+  showToast("Candidate prep note copied");
+});
+els.downloadClosingPack?.addEventListener("click", () => {
+  if (!state.pipeline.length) return;
+  downloadTextFile("profileforge-closing-pack.html", closingPackHtml(), "text/html");
+  showToast("Closing pack downloaded");
+});
+els.closingDemo?.addEventListener("click", async () => {
+  await loadDemoBatch();
+  scrollToSection("#closingPanel");
+});
+[els.closingCurrency, els.closingPackage, els.closingFeePercent].forEach((input) => {
+  input?.addEventListener("input", () => {
+    renderClosing();
+    renderFounderCockpit();
+  });
+  input?.addEventListener("change", () => {
+    renderClosing();
+    renderFounderCockpit();
+  });
 });
 els.copyTheaterScript?.addEventListener("click", async () => {
   await copyText(theaterScriptText());
@@ -4656,6 +5346,23 @@ els.copyPrivacyNote?.addEventListener("click", async () => {
   await copyText(privacyNoteText());
   showToast("Privacy note copied");
 });
+els.copyFounderUpdate?.addEventListener("click", async () => {
+  await copyText(founderUpdateText());
+  showToast("Founder update copied");
+});
+els.copyFounderPitch?.addEventListener("click", async () => {
+  await copyText(founderPitchText());
+  showToast("Founder pitch copied");
+});
+els.downloadFounderPack?.addEventListener("click", () => {
+  if (!state.pipeline.length) return;
+  downloadTextFile("profileforge-founder-cockpit.html", founderPackHtml(), "text/html");
+  showToast("Founder launch pack downloaded");
+});
+els.founderDemo?.addEventListener("click", async () => {
+  await loadDemoBatch();
+  scrollToSection("#founderCockpit");
+});
 els.openCommand?.addEventListener("click", () => setCommandDeck(true));
 els.closeCommand?.addEventListener("click", () => setCommandDeck(false));
 els.commandDock?.addEventListener("click", (event) => {
@@ -4674,6 +5381,11 @@ els.commandActions?.addEventListener("click", (event) => {
 });
 [els.starterMembers, els.proMembers, els.studioMembers].forEach((input) => {
   input?.addEventListener("input", renderLaunchRevenue);
+  input?.addEventListener("change", renderLaunchRevenue);
+});
+[els.founderVisitors, els.founderSignupRate, els.founderPaidRate].forEach((input) => {
+  input?.addEventListener("input", renderFounderCockpit);
+  input?.addEventListener("change", renderFounderCockpit);
 });
 els.backToTop?.addEventListener("click", () => {
   if (window.scrollTo) {

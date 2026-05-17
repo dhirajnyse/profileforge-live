@@ -68,6 +68,14 @@
         <svg viewBox="0 0 24 24"><path d="M4 5l16 7-16 7 3-7z"></path><path d="M7 12h7"></path></svg>
         Submit
       </a>
+      <a href="#interviewPanel">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v11H7l-3 3z"></path><path d="M8 9h8"></path><path d="M8 13h5"></path><path d="M17 19l2 2 3-4"></path></svg>
+        Interview
+      </a>
+      <a href="#closingPanel">
+        <svg viewBox="0 0 24 24"><path d="M5 12l4 4L19 6"></path><path d="M4 20h16"></path><path d="M7 4h10"></path><path d="M9 8h6"></path></svg>
+        Close
+      </a>
       <a href="#theaterPanel">
         <svg viewBox="0 0 24 24"><path d="M4 5h16v12H4z"></path><path d="M8 21h8"></path><path d="M12 17v4"></path><path d="M9 9l6 3-6 3z"></path></svg>
         Theater
@@ -75,6 +83,10 @@
       <a href="#launchDesk">
         <svg viewBox="0 0 24 24"><path d="M5 19c5-1 9-5 10-10l4-4"></path><path d="M14 5h5v5"></path><path d="M5 19l4-1"></path><path d="M5 19l1-4"></path></svg>
         Launch
+      </a>
+      <a href="#founderCockpit">
+        <svg viewBox="0 0 24 24"><path d="M4 19h16"></path><path d="M6 16l4-5 3 3 5-7"></path><path d="M18 7h-4"></path><path d="M18 7v4"></path></svg>
+        Founder
       </a>
     </nav>
 
@@ -688,6 +700,119 @@
       </div>
     </section>
 
+    <section class="interview-shell" id="interviewPanel">
+      <div class="panel interview-panel">
+        <div class="panel-heading">
+          <h2>Interview Studio</h2>
+          <div class="output-actions">
+            <button type="button" class="secondary" id="copyInterviewInvite">
+              <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"></path><path d="M4 7l8 6 8-6"></path></svg>
+              Invite
+            </button>
+            <button type="button" class="secondary" id="copyInterviewScorecard">
+              <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M8 8h8"></path><path d="M8 12h5"></path><path d="M8 16h8"></path></svg>
+              Scorecard
+            </button>
+            <button type="button" class="secondary" id="downloadInterviewKit">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg>
+              Kit HTML
+            </button>
+          </div>
+        </div>
+        <div class="interview-hero">
+          <div>
+            <span class="launch-kicker">Interview studio</span>
+            <h3>Generate panel-ready interviews from shortlisted CVs</h3>
+            <p>ProfileForge prepares interview questions, agenda, scoring rubric, calendar invite text, and candidate-specific focus areas from the same profile data.</p>
+          </div>
+          <button type="button" class="secondary demo-button" id="interviewDemo">
+            <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"></path><path d="M9 8h6"></path><path d="M9 12h6"></path><path d="M9 16h3"></path></svg>
+            Load interview demo
+          </button>
+        </div>
+        <div class="interview-builder">
+          <label>
+            <span>Interview focus</span>
+            <input id="interviewRoleFocus" type="text" value="Role fit, communication, delivery depth" />
+          </label>
+          <label>
+            <span>Duration</span>
+            <select id="interviewDuration">
+              <option value="30">30 minutes</option>
+              <option value="45" selected>45 minutes</option>
+              <option value="60">60 minutes</option>
+            </select>
+          </label>
+          <label>
+            <span>Mode</span>
+            <select id="interviewMode">
+              <option value="Video call">Video call</option>
+              <option value="In-person">In-person</option>
+              <option value="Phone screen">Phone screen</option>
+            </select>
+          </label>
+        </div>
+        <div class="interview-content" id="interviewContent">
+          <div class="empty-state">Load demo or convert CVs to build interview kits.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing-shell" id="closingPanel">
+      <div class="panel closing-panel">
+        <div class="panel-heading">
+          <h2>Closing Studio</h2>
+          <div class="output-actions">
+            <button type="button" class="secondary" id="copyClosingFeedback">
+              <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"></path><path d="M4 7l8 6 8-6"></path></svg>
+              Feedback
+            </button>
+            <button type="button" class="secondary" id="copyCandidatePrep">
+              <svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-5"></path><path d="M4 20h16"></path><path d="M6 4h12v12H6z"></path></svg>
+              Prep
+            </button>
+            <button type="button" class="secondary" id="downloadClosingPack">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg>
+              Pack HTML
+            </button>
+          </div>
+        </div>
+        <div class="closing-hero">
+          <div>
+            <span class="launch-kicker">Closing studio</span>
+            <h3>Turn shortlisted CVs into feedback, prep, and placement action</h3>
+            <p>ProfileForge builds the client feedback request, candidate prep note, offer-fee estimate, and closing checklist so every good shortlist has a clean next move.</p>
+          </div>
+          <button type="button" class="secondary demo-button" id="closingDemo">
+            <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"></path><path d="M9 8h6"></path><path d="M9 12h6"></path><path d="M9 16h3"></path></svg>
+            Load closing demo
+          </button>
+        </div>
+        <div class="closing-builder">
+          <label>
+            <span>Currency</span>
+            <select id="closingCurrency">
+              <option value="USD">USD</option>
+              <option value="AED" selected>AED</option>
+              <option value="INR">INR</option>
+              <option value="GBP">GBP</option>
+            </select>
+          </label>
+          <label>
+            <span>Package estimate</span>
+            <input id="closingPackage" type="number" min="0" step="1000" value="300000" />
+          </label>
+          <label>
+            <span>Fee percent</span>
+            <input id="closingFeePercent" type="number" min="0" max="100" step="0.5" value="8" />
+          </label>
+        </div>
+        <div class="closing-content" id="closingContent">
+          <div class="empty-state">Load demo or convert CVs to build a closing pack.</div>
+        </div>
+      </div>
+    </section>
+
     <section class="theater-shell" id="theaterPanel">
       <div class="panel theater-panel">
         <div class="panel-heading">
@@ -826,6 +951,59 @@
       </div>
     </section>
 
+    <section class="founder-shell" id="founderCockpit">
+      <div class="panel founder-panel">
+        <div class="panel-heading">
+          <h2>Founder Cockpit</h2>
+          <div class="output-actions">
+            <button type="button" class="secondary" id="copyFounderUpdate">
+              <svg viewBox="0 0 24 24"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path></svg>
+              Update
+            </button>
+            <button type="button" class="secondary" id="copyFounderPitch">
+              <svg viewBox="0 0 24 24"><path d="M4 12h16"></path><path d="M14 6l6 6-6 6"></path><path d="M4 6h6"></path><path d="M4 18h6"></path></svg>
+              Pitch
+            </button>
+            <button type="button" class="secondary" id="downloadFounderPack">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg>
+              Pack HTML
+            </button>
+          </div>
+        </div>
+
+        <div class="founder-hero">
+          <div>
+            <span class="launch-kicker">Founder cockpit</span>
+            <h3>Turn every CV batch into launch traction and a sharper story</h3>
+            <p>ProfileForge now converts usage into founder metrics: funnel health, revenue forecast, market proof, copy-ready updates, and a downloadable launch pack for partners or early customers.</p>
+          </div>
+          <button type="button" class="secondary demo-button" id="founderDemo">
+            <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"></path><path d="M9 8h6"></path><path d="M9 12h6"></path><path d="M9 16h3"></path></svg>
+            Load founder demo
+          </button>
+        </div>
+
+        <div class="founder-builder">
+          <label>
+            <span>Monthly visitors</span>
+            <input id="founderVisitors" type="number" min="0" step="50" value="1200" />
+          </label>
+          <label>
+            <span>Signup rate</span>
+            <input id="founderSignupRate" type="number" min="0" max="100" step="0.5" value="8" />
+          </label>
+          <label>
+            <span>Paid conversion</span>
+            <input id="founderPaidRate" type="number" min="0" max="100" step="0.5" value="18" />
+          </label>
+        </div>
+
+        <div class="founder-content" id="founderContent">
+          <div class="empty-state">Load demo or convert CVs to build founder metrics.</div>
+        </div>
+      </div>
+    </section>
+
     <footer class="trust-footer" id="trustFooter">
       <div class="trust-brand">
         <span class="launch-kicker">Public beta</span>
@@ -886,7 +1064,7 @@
         </div>
         <label class="command-search">
           <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
-          <input id="commandSearch" type="text" autocomplete="off" placeholder="Try demo, submit, portal, galaxy, pricing..." />
+          <input id="commandSearch" type="text" autocomplete="off" placeholder="Try demo, founder, submit, portal, galaxy, pricing..." />
         </label>
         <div class="command-actions" id="commandActions">
           <button type="button" data-command="demo" data-keywords="demo sample preview live batch">
@@ -925,6 +1103,14 @@
             <strong>Open Submission Studio</strong>
             <span>Generate client-ready send copy.</span>
           </button>
+          <button type="button" data-command="interview" data-keywords="interview questions scorecard invite panel kit agenda">
+            <strong>Open Interview Studio</strong>
+            <span>Create questions, invite text, and panel scorecards.</span>
+          </button>
+          <button type="button" data-command="closing" data-keywords="closing close offer feedback client candidate prep fee placement">
+            <strong>Open Closing Studio</strong>
+            <span>Prepare feedback, offer, and placement close pack.</span>
+          </button>
           <button type="button" data-command="theater" data-keywords="theater showtime presentation slides deck client call">
             <strong>Start Showtime Theater</strong>
             <span>Open a live shortlist presentation.</span>
@@ -948,6 +1134,10 @@
           <button type="button" data-command="launch" data-keywords="launch desk domain checklist">
             <strong>Open Launch Desk</strong>
             <span>Jump to pricing and domain-readiness tools.</span>
+          </button>
+          <button type="button" data-command="founder" data-keywords="founder cockpit traction revenue forecast pitch launch update investor">
+            <strong>Open Founder Cockpit</strong>
+            <span>Turn workflow activity into traction, forecast, and launch copy.</span>
           </button>
         </div>
         <div class="command-empty" id="commandEmpty" hidden>No matching command</div>
@@ -986,6 +1176,6 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=20260516-submission-studio"></script>
+    <script src="./app.js?v=20260517-founder-cockpit"></script>
   </body>
 </html>

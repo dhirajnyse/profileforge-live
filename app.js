@@ -3719,6 +3719,35 @@ function rowXml(rowNumber, values, height, styleRowNumber = rowNumber, colOffset
 }
 
 const PROFILE_ROW_HEIGHTS = [37.5, 22.5, 22.5, 22.5, 22.5, 66, 81, 51, 39, 36, 88.5, 9, 33];
+const PROFILE_DETAIL_WRAP_CHARS = 88;
+const PROFILE_CATEGORY_WRAP_CHARS = 22;
+const PROFILE_ROW_HEIGHT_CAPS = [42, 36, 42, 36, 36, 150, 132, 150, 96, 96, 165, 9, 45];
+
+function wrappedLineCount(value, charsPerLine) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) return 1;
+  return text
+    .split(/\r?\n/)
+    .reduce((lines, part) => lines + Math.max(1, Math.ceil(part.length / charsPerLine)), 0);
+}
+
+function horizontalRowHeight(profileTables, rowIndex) {
+  if (rowIndex === 11) return PROFILE_ROW_HEIGHTS[rowIndex];
+
+  let maxLines = 1;
+  profileTables.forEach((table) => {
+    const values = table[rowIndex] || [];
+    maxLines = Math.max(
+      maxLines,
+      wrappedLineCount(values[1], PROFILE_CATEGORY_WRAP_CHARS),
+      wrappedLineCount(values[2], PROFILE_DETAIL_WRAP_CHARS),
+    );
+  });
+
+  const estimatedHeight = maxLines * 15 + 9;
+  const cappedHeight = Math.min(PROFILE_ROW_HEIGHT_CAPS[rowIndex], Math.max(PROFILE_ROW_HEIGHTS[rowIndex], estimatedHeight));
+  return Math.ceil(cappedHeight * 2) / 2;
+}
 
 function sheetXml(profile) {
   const rows = profileTable(profile).map((values, index) => rowXml(index + 1, values, PROFILE_ROW_HEIGHTS[index])).join("");
@@ -3759,8 +3788,9 @@ function stackedSheetData(records) {
 
 function horizontalStackedSheetData(records) {
   const profileTables = records.map((record) => profileTable(record.profile));
-  const rows = PROFILE_ROW_HEIGHTS.map((height, index) => {
+  const rows = PROFILE_ROW_HEIGHTS.map((_, index) => {
     const rowNumber = index + 1;
+    const height = horizontalRowHeight(profileTables, index);
     const cells = profileTables
       .map((table, recordIndex) => rowCellsXml(rowNumber, table[index], rowNumber, recordIndex * 4))
       .join("");
@@ -3790,7 +3820,7 @@ function stackedSheetXml(records, direction = "vertical") {
   const { rows, totalRows, totalColumns = 3 } = horizontal ? horizontalStackedSheetData(records) : stackedSheetData(records);
   const lastCell = `${columnName(totalColumns)}${totalRows}`;
   const pageSetup = horizontal
-    ? '<pageSetup paperSize="9" orientation="portrait" fitToWidth="0" fitToHeight="1" horizontalDpi="300" verticalDpi="300"/>'
+    ? '<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="1" horizontalDpi="300" verticalDpi="300"/>'
     : '<pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0" horizontalDpi="300" verticalDpi="300"/>';
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
@@ -3857,11 +3887,11 @@ function stylesXml() {
   <cellXfs count="7">
     <xf numFmtId="0" fontId="0" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center"/></xf>
     <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1" indent="1"/></xf>
     <xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="2" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1" indent="1"/></xf>
     <xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
-    <xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1" indent="1"/></xf>
   </cellXfs>
   <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
   <dxfs count="0"/>
